@@ -17,6 +17,7 @@ from csob_ceb_bc.rest.transfer import RestTransferClient
 from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.sqlite_repo import SqliteStateRepository
 from csob_ceb_bc.uploads.manager import UploadManager
+from csob_ceb_bc.rate_limit import TokenBucketRateLimiter
 
 
 class BusinessConnectorClient:
@@ -68,7 +69,11 @@ class BusinessConnectorClient:
         cert_store = CertificateStore(config.certificate)
         cert_store.validate_not_expiring()
         state = SqliteStateRepository(config.state_url)
-        soap = SoapGateway(config)
+        rate_limiter = TokenBucketRateLimiter(
+            capacity=config.rate_limit.soap_calls,
+            refill_per_second=config.rate_limit.soap_calls / config.rate_limit.per_seconds,
+        )
+        soap = SoapGateway(config, rate_limiter=rate_limiter)
         rest = RestTransferClient(
             cert_store=cert_store,
             timeout=None,  # uses defaults

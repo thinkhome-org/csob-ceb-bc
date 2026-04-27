@@ -8,7 +8,7 @@ import zeep
 from zeep.exceptions import Fault
 
 from csob_ceb_bc.config import ConnectorConfig, Environment
-from csob_ceb_bc.errors import CsobBCSoapFault
+from csob_ceb_bc.errors import CsobBCSoapFault, CsobBCRateLimitError
 from csob_ceb_bc.models import (
     DownloadFile,
     DownloadFileStatus,
@@ -22,6 +22,7 @@ from csob_ceb_bc.models import (
 )
 from csob_ceb_bc.soap.faults import map_soap_fault
 from csob_ceb_bc.retry import retry_soap
+from csob_ceb_bc.rate_limit import TokenBucketRateLimiter
 
 
 class DownloadListResult:
@@ -36,12 +37,27 @@ class SoapGateway:
     PROD_URL = "https://ceb-bc.csob.cz/cebbc/api"
     DEMO_URL = "https://testceb-bc.csob.cz/cebbc/api"
 
-    def __init__(self, config: ConnectorConfig, wsdl_path: str | None = None) -> None:
+    def __init__(
+        self,
+        config: ConnectorConfig,
+        wsdl_path: str | None = None,
+        rate_limiter: TokenBucketRateLimiter | None = None,
+    ) -> None:
         self._config = config
         self._endpoint = self.DEMO_URL if config.environment == Environment.DEMO else self.PROD_URL
         self._wsdl_path = wsdl_path or self._endpoint + "?wsdl"
         self._client = zeep.Client(self._wsdl_path)
+        self._rate_limiter = rate_limiter
         self._setup_transport()
+
+    def _check_rate_limit(self) -> None:
+        if self._rate_limiter is not None:
+            if not self._rate_limiter.acquire():
+                raise CsobBCRateLimitError(
+                    "SOAP rate limit exceeded",
+                    operation="soap",
+                    safe_message="Rate limit exceeded",
+                )
 
     def _setup_transport(self) -> None:
         # zeep uses requests under the hood; configure mTLS via transport session
@@ -79,6 +95,7 @@ class SoapGateway:
         prev_query_timestamp: datetime | None = None,
         filter: DownloadFilter | None = None,
     ) -> DownloadListResult:
+        self._check_rate_limit()
         request: dict[str, Any] = {"ContractNumber": self._config.contract_number}
         if prev_query_timestamp is not None:
             request["PrevQueryTimestamp"] = prev_query_timestamp.isoformat()
@@ -127,6 +144,7 @@ class SoapGateway:
     def start_upload_file_list_v3(
         self, files: list[UploadFile]
     ) -> list[UploadStartResult]:
+        self._check_rate_limit()
         request_files = [
             {
                 "Filename": f.filename,
@@ -180,6 +198,7 @@ class SoapGateway:
         self,
         files: list[tuple[str, str, str]],  # (filename, hash, new_file_id)
     ) -> list[UploadFinishResult]:
+        self._check_rate_limit()
         request_files = [
             {"Filename": fn, "Hash": h, "NewFileId": nfid}
             for fn, h, nfid in files
