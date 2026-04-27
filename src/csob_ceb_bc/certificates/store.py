@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ssl
 import tempfile
 from pathlib import Path
 
@@ -95,13 +96,18 @@ class CertificateStore:
             raise CsobBCCertificateError(f"Certificate validation failed: {exc}") from exc
 
     def build_httpx_client(self, verify: bool | str = True) -> httpx.Client:
-        kwargs: dict[str, object] = {
-            "cert": (str(self.cert_path), str(self.key_path)),
-            "verify": verify,
-        }
-        if self._config.ca_bundle:
-            kwargs["verify"] = str(self._config.ca_bundle)
-        return httpx.Client(**kwargs)
+        if verify is False:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+        else:
+            context = ssl.create_default_context()
+            if isinstance(verify, str):
+                context.load_verify_locations(verify)
+            elif self._config.ca_bundle:
+                context.load_verify_locations(str(self._config.ca_bundle))
+        context.load_cert_chain(str(self.cert_path), str(self.key_path))
+        return httpx.Client(verify=context)
 
     def __del__(self) -> None:
         if self._temp_dir is not None:
