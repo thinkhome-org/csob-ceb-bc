@@ -77,6 +77,20 @@ def test_get_download_file_list_v4(mock_client_cls: MagicMock):
 
 
 @patch("csob_ceb_bc.soap.gateway.zeep.Client")
+def test_get_download_file_list_v4_missing_timestamp(mock_client_cls: MagicMock):
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.service.GetDownloadFileList.return_value = {
+        "FileList": None,
+    }
+
+    gw = SoapGateway(_config(), wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"))
+    result = gw.get_download_file_list_v4()
+    assert result.query_timestamp is not None
+    assert len(result.files) == 0
+
+
+@patch("csob_ceb_bc.soap.gateway.zeep.Client")
 def test_soap_fault_mapped(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client

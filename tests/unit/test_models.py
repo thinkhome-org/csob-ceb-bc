@@ -58,6 +58,9 @@ def test_download_filter_with_types():
 def test_upload_file_validates_filename_max_length():
     with pytest.raises(ValueError):
         UploadFile(filename="x" * 51, format="XML SEPA", mode=UploadMode.AllOrNothing)
+    # Direct call for coverage (pydantic-core may skip Python line tracing)
+    with pytest.raises(ValueError):
+        UploadFile._filename_max_length("x" * 51)
 
 
 def test_upload_file_separator_validation():
@@ -93,6 +96,10 @@ def test_upload_file_hash_must_be_64_hex():
         hash="a" * 64,
     )
     assert valid.hash == "a" * 64
+    # Direct calls for coverage
+    assert UploadFile._hash_must_be_sha256(None) is None
+    with pytest.raises(ValueError):
+        UploadFile._hash_must_be_sha256("gg")
 
 
 def test_download_file_model():

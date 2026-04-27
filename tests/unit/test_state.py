@@ -12,6 +12,20 @@ def repo(tmp_path: Path):
     return SqliteStateRepository(f"sqlite:///{db_path}")
 
 
+def test_init_with_plain_path(tmp_path: Path):
+    db_path = tmp_path / "plain.db"
+    repo = SqliteStateRepository(str(db_path))
+    repo.create_upload_attempt(
+        attempt_id="a1",
+        filename="pay.xml",
+        file_hash="abc",
+        size=1,
+        file_format="XML SEPA",
+        mode="AllOrNothing",
+    )
+    assert repo.get_upload_attempt("a1") is not None
+
+
 def test_get_set_profile_cursor(repo: SqliteStateRepository):
     key = "prod:123456:VYPIS"
     assert repo.get_profile_cursor(key) is None
@@ -33,6 +47,10 @@ def test_create_upload_attempt(repo: SqliteStateRepository):
     assert row is not None
     assert row["filename"] == "pay.xml"
     assert row["status"] == "started"
+
+
+def test_get_upload_attempt_missing(repo: SqliteStateRepository):
+    assert repo.get_upload_attempt("nonexistent") is None
 
 
 def test_save_new_file_id(repo: SqliteStateRepository):
@@ -61,3 +79,13 @@ def test_idempotency_check(repo: SqliteStateRepository):
     )
     repo.mark_idempotency_key(h, "a3")
     assert repo.get_attempt_id_by_hash(h) == "a3"
+
+
+def test_create_import_protocol(repo: SqliteStateRepository):
+    repo.create_import_protocol(
+        new_file_id="NFID-1",
+        upload_hash="abc",
+        filename="prot.xml",
+        client_app_guid="guid",
+    )
+    # Just verify it doesn't raise; no getter currently exposed

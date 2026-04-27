@@ -142,6 +142,29 @@ def test_upload_empty_start_results(repo: SqliteStateRepository, tmp_path: Path)
     assert result is None
 
 
+def test_upload_start_u_without_url(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+    soap = MagicMock()
+    soap.start_upload_file_list_v3.return_value = [
+        MagicMock(filename="pay.xml", status=UploadStartStatus.U, url=None, ticket_id="T1")
+    ]
+    rest = MagicMock()
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=soap,
+        rest=rest,
+        state=repo,
+    )
+    result = mgr.upload_payment_batch(
+        file=file_path,
+        metadata=UploadFile(filename="pay.xml", format="XML SEPA", mode=UploadMode.AllOrNothing),
+    )
+    assert result is None
+
+
 def test_upload_rejected_with_metrics(repo: SqliteStateRepository, tmp_path: Path):
     file_path = tmp_path / "pay.xml"
     file_path.write_text("<payments/>")
