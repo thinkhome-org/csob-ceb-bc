@@ -14,6 +14,10 @@ from csob_ceb_bc.models import (
 from csob_ceb_bc.rest.transfer import RestTransferClient
 from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.base import StateRepository
+from csob_ceb_bc.logging import get_logger
+from csob_ceb_bc.redaction import redact_contract
+
+logger = get_logger("csob_ceb_bc.uploads")
 
 
 class UploadManager:
@@ -47,11 +51,16 @@ class UploadManager:
     ) -> UploadFinishResult | None:
         sha = self.compute_sha256(file)
         size = file.stat().st_size
+        log_ctx = logger.bind(
+            contract_redacted=redact_contract(self._contract_number),
+            filename=metadata.filename,
+            file_hash=sha,
+        )
 
         # Idempotency check
         existing = self._state.get_attempt_id_by_hash(sha)
         if existing:
-            # Already attempted; do not blindly re-upload
+            log_ctx.info("upload_idempotent_skip", existing_attempt_id=existing)
             return None
 
         attempt_id = str(uuid.uuid4())
@@ -69,16 +78,19 @@ class UploadManager:
             file_format=enriched.format,
             mode=enriched.mode.value,
         )
+        log_ctx.info("upload_start", attempt_id=attempt_id)
 
         start_results = self._soap.start_upload_file_list_v3(files=[enriched])
         if not start_results:
             return None
         start: UploadStartResult = start_results[0]
+        log_ctx.info("upload_start_result", status=start.status.value, ticket_id=start.ticket_id)
 
         if start.status == UploadStartStatus.R:
             self._state.save_upload_finish_result(
                 attempt_id=attempt_id, finish_status="R", ticket_id=start.ticket_id
             )
+            log_ctx.info("upload_rejected_at_start", ticket_id=start.ticket_id)
             return None
 
         if start.status == UploadStartStatus.U and start.url:
@@ -88,6 +100,7 @@ class UploadManager:
                 filename=enriched.filename,
             )
             self._state.save_upload_new_file_id(attempt_id, rest_result.new_file_id)
+            log_ctx.info("upload_rest_complete", new_file_id=rest_result.new_file_id)
 
             finish_results = self._soap.finish_upload_file_list_v2(
                 files=[(enriched.filename, sha, rest_result.new_file_id)]
@@ -100,6 +113,29 @@ class UploadManager:
                     ticket_id=finish.ticket_id,
                 )
                 self._state.mark_idempotency_key(sha, attempt_id)
+                log_ctx.info("upload_finish", status=finish.status.value, ticket_id=finish.ticket_id)
                 return finish
 
         return None
+
+    def resume_pending(self) -> list[UploadFinishResult]:
+        """Resume uploads that completed REST transfer but not finish."""
+        pending = self._state.get_pending_uploads()
+        results: list[UploadFinishResult] = []
+        for row in pending:
+            attempt_id = row["attempt_id"]
+            filename = row["filename"]
+            file_hash = row["file_hash"]
+            new_file_id = row["new_file_id"]
+            finish_results = self._soap.finish_upload_file_list_v2(
+                files=[(filename, file_hash, new_file_id)]
+            )
+            if finish_results:
+                finish = finish_results[0]
+                self._state.save_upload_finish_result(
+                    attempt_id=attempt_id,
+                    finish_status=finish.status.value,
+                    ticket_id=finish.ticket_id,
+                )
+                results.append(finish)
+        return results

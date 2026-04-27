@@ -145,3 +145,15 @@ class SqliteStateRepository(StateRepository):
                    VALUES (?, ?, ?, ?)""",
                 (new_file_id, upload_hash, filename, client_app_guid),
             )
+
+    def get_pending_uploads(self) -> list[dict[str, Any]]:
+        """Return uploads in 'rest_done' state without finish result."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT a.attempt_id, a.filename, a.file_hash, a.file_format, a.mode, r.new_file_id
+                   FROM upload_attempts a
+                   JOIN upload_rest_results r ON a.attempt_id = r.attempt_id
+                   LEFT JOIN upload_finish_results f ON a.attempt_id = f.attempt_id
+                   WHERE a.status = 'rest_done' AND f.id IS NULL"""
+            ).fetchall()
+        return [dict(row) for row in rows]

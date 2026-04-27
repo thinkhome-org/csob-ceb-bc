@@ -8,6 +8,10 @@ from csob_ceb_bc.models import DownloadFile, DownloadFileStatus, DownloadFilter
 from csob_ceb_bc.rest.transfer import RestTransferClient
 from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.base import StateRepository
+from csob_ceb_bc.logging import get_logger
+from csob_ceb_bc.redaction import redact_contract
+
+logger = get_logger("csob_ceb_bc.downloads")
 
 
 class DownloadManager:
@@ -58,10 +62,16 @@ class DownloadManager:
         target_dir.mkdir(parents=True, exist_ok=True)
         key = self._profile_key(filter)
         prev = self._state.get_profile_cursor(key)
+        log_ctx = logger.bind(
+            contract_redacted=redact_contract(self._contract_number),
+            profile_key=key,
+        )
+        log_ctx.info("download_start", prev_query_timestamp=prev.isoformat() if prev else None)
         result = self._soap.get_download_file_list_v4(
             prev_query_timestamp=prev,
             filter=filter,
         )
+        log_ctx.info("download_soap_complete", file_count=len(result.files))
 
         downloaded: list[DownloadFile] = []
         has_unresolved = False
@@ -69,19 +79,24 @@ class DownloadManager:
         for file in result.files:
             if file.status == DownloadFileStatus.R or file.url is None:
                 has_unresolved = True
+                log_ctx.info("download_file_unresolved", filename=file.filename, status=file.status.value)
                 continue
             if file.status == DownloadFileStatus.F:
                 # permanent failure — log and skip
+                log_ctx.info("download_file_permanent_failure", filename=file.filename)
                 continue
             if file.status == DownloadFileStatus.D and file.url:
                 local_path = target_dir / file.filename
                 self._rest.download_to_file(file.url, local_path)
                 downloaded.append(file)
+                log_ctx.info("download_file_success", filename=file.filename, local_path=str(local_path))
 
         if not has_unresolved and downloaded:
             self._state.set_profile_cursor(key, result.query_timestamp)
+            log_ctx.info("download_cursor_advanced", query_timestamp=result.query_timestamp.isoformat())
         elif not has_unresolved and not downloaded:
             # no files at all, safe to advance cursor
             self._state.set_profile_cursor(key, result.query_timestamp)
+            log_ctx.info("download_cursor_advanced_empty", query_timestamp=result.query_timestamp.isoformat())
 
         return downloaded

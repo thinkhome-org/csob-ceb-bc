@@ -105,5 +105,4 @@ class BusinessConnectorClient:
 
     def resume_pending(self) -> None:
         """Resume any pending uploads or downloads after a crash."""
-        # MVP: placeholder for crash recovery orchestration
-        pass
+        self._upload_manager.resume_pending()

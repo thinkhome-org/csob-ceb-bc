@@ -9,6 +9,7 @@ import httpx
 from csob_ceb_bc.certificates.store import CertificateStore
 from csob_ceb_bc.errors import CsobBCHttpError, CsobBCProtocolError
 from csob_ceb_bc.models import HttpTransferResult, RestUploadResult
+from csob_ceb_bc.retry import retry_rest
 
 
 class RestTransferClient:
@@ -27,6 +28,7 @@ class RestTransferClient:
     def _client(self) -> httpx.Client:
         return self._cert_store.build_httpx_client(verify=self._verify)
 
+    @retry_rest(max_attempts=3)
     def download_to_file(self, url: str, target: Path) -> HttpTransferResult:
         part = target.with_suffix(target.suffix + ".part")
         start = time.monotonic()
@@ -49,6 +51,7 @@ class RestTransferClient:
         # unreachable
         raise RuntimeError("unreachable")
 
+    @retry_rest(max_attempts=3)
     def upload_multipart(self, url: str, file: Path, filename: str) -> RestUploadResult:
         start = time.monotonic()
         with self._client() as client:

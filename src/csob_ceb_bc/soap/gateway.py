@@ -21,6 +21,7 @@ from csob_ceb_bc.models import (
     UploadStartStatus,
 )
 from csob_ceb_bc.soap.faults import map_soap_fault
+from csob_ceb_bc.retry import retry_soap
 
 
 class DownloadListResult:
@@ -72,6 +73,7 @@ class SoapGateway:
         except ValueError:
             return None
 
+    @retry_soap(max_attempts=3)
     def get_download_file_list_v4(
         self,
         prev_query_timestamp: datetime | None = None,
@@ -121,6 +123,7 @@ class SoapGateway:
 
         return DownloadListResult(query_timestamp=qt, files=files)
 
+    @retry_soap(max_attempts=3)
     def start_upload_file_list_v3(
         self, files: list[UploadFile]
     ) -> list[UploadStartResult]:
@@ -172,6 +175,7 @@ class SoapGateway:
             )
         return results
 
+    @retry_soap(max_attempts=3)
     def finish_upload_file_list_v2(
         self,
         files: list[tuple[str, str, str]],  # (filename, hash, new_file_id)

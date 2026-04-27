@@ -59,3 +59,7 @@ class StateRepository(ABC):
         client_app_guid: str,
     ) -> None:
         ...
+
+    @abstractmethod
+    def get_pending_uploads(self) -> list[dict[str, Any]]:
+        ...
