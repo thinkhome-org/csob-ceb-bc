@@ -18,6 +18,7 @@ from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.sqlite_repo import SqliteStateRepository
 from csob_ceb_bc.uploads.manager import UploadManager
 from csob_ceb_bc.rate_limit import TokenBucketRateLimiter
+from csob_ceb_bc.metrics import MetricsCollector
 
 
 class BusinessConnectorClient:
@@ -31,12 +32,14 @@ class BusinessConnectorClient:
         rest: RestTransferClient,
         state: SqliteStateRepository,
         cert_store: CertificateStore,
+        metrics: MetricsCollector | None = None,
     ) -> None:
         self._config = config
         self._soap = soap
         self._rest = rest
         self._state = state
         self._cert_store = cert_store
+        self._metrics = metrics or MetricsCollector()
 
         cert_pem = cert_store.cert_path.read_bytes()
         fingerprint = hashlib.sha256(cert_pem).hexdigest()[:16]
@@ -49,6 +52,7 @@ class BusinessConnectorClient:
             soap=soap,
             rest=rest,
             state=state,
+            metrics=self._metrics,
         )
         self._upload_manager = UploadManager(
             contract_number=config.contract_number,
@@ -56,12 +60,14 @@ class BusinessConnectorClient:
             soap=soap,
             rest=rest,
             state=state,
+            metrics=self._metrics,
         )
         self._import_protocol_manager = ImportProtocolManager(
             client_app_guid=config.client_app_guid,
             soap=soap,
             rest=rest,
             state=state,
+            metrics=self._metrics,
         )
 
     @classmethod
@@ -111,3 +117,7 @@ class BusinessConnectorClient:
     def resume_pending(self) -> None:
         """Resume any pending uploads or downloads after a crash."""
         self._upload_manager.resume_pending()
+
+    def metrics_snapshot(self) -> dict:
+        """Return current metrics snapshot."""
+        return self._metrics.snapshot()

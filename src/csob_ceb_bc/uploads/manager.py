@@ -16,6 +16,7 @@ from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.base import StateRepository
 from csob_ceb_bc.logging import get_logger
 from csob_ceb_bc.redaction import redact_contract
+from csob_ceb_bc.metrics import MetricsCollector, timed
 
 logger = get_logger("csob_ceb_bc.uploads")
 
@@ -29,12 +30,14 @@ class UploadManager:
         soap: SoapGateway,
         rest: RestTransferClient,
         state: StateRepository,
+        metrics: MetricsCollector | None = None,
     ) -> None:
         self._contract_number = contract_number
         self._client_app_guid = client_app_guid
         self._soap = soap
         self._rest = rest
         self._state = state
+        self._metrics = metrics
 
     @staticmethod
     def compute_sha256(file: Path) -> str:
@@ -61,6 +64,8 @@ class UploadManager:
         existing = self._state.get_attempt_id_by_hash(sha)
         if existing:
             log_ctx.info("upload_idempotent_skip", existing_attempt_id=existing)
+            if self._metrics:
+                self._metrics.inc("upload_idempotent_skips")
             return None
 
         attempt_id = str(uuid.uuid4())
@@ -85,22 +90,36 @@ class UploadManager:
             return None
         start: UploadStartResult = start_results[0]
         log_ctx.info("upload_start_result", status=start.status.value, ticket_id=start.ticket_id)
+        if self._metrics:
+            self._metrics.inc("upload_start_calls")
 
         if start.status == UploadStartStatus.R:
             self._state.save_upload_finish_result(
                 attempt_id=attempt_id, finish_status="R", ticket_id=start.ticket_id
             )
             log_ctx.info("upload_rejected_at_start", ticket_id=start.ticket_id)
+            if self._metrics:
+                self._metrics.inc("upload_rejected")
             return None
 
         if start.status == UploadStartStatus.U and start.url:
-            rest_result = self._rest.upload_multipart(
-                url=start.url,
-                file=file,
-                filename=enriched.filename,
-            )
+            if self._metrics:
+                with timed(self._metrics, "upload_rest_latency_seconds"):
+                    rest_result = self._rest.upload_multipart(
+                        url=start.url,
+                        file=file,
+                        filename=enriched.filename,
+                    )
+            else:
+                rest_result = self._rest.upload_multipart(
+                    url=start.url,
+                    file=file,
+                    filename=enriched.filename,
+                )
             self._state.save_upload_new_file_id(attempt_id, rest_result.new_file_id)
             log_ctx.info("upload_rest_complete", new_file_id=rest_result.new_file_id)
+            if self._metrics:
+                self._metrics.inc("upload_rest_success")
 
             finish_results = self._soap.finish_upload_file_list_v2(
                 files=[(enriched.filename, sha, rest_result.new_file_id)]
@@ -114,6 +133,12 @@ class UploadManager:
                 )
                 self._state.mark_idempotency_key(sha, attempt_id)
                 log_ctx.info("upload_finish", status=finish.status.value, ticket_id=finish.ticket_id)
+                if self._metrics:
+                    self._metrics.inc("upload_finish_calls")
+                    if finish.status == UploadFinishStatus.I:
+                        self._metrics.inc("upload_finish_import_started")
+                    elif finish.status == UploadFinishStatus.R:
+                        self._metrics.inc("upload_finish_rejected")
                 return finish
 
         return None
@@ -138,4 +163,8 @@ class UploadManager:
                     ticket_id=finish.ticket_id,
                 )
                 results.append(finish)
+                if self._metrics:
+                    self._metrics.inc("upload_resume_success")
+        if self._metrics:
+            self._metrics.gauge("upload_pending_count", len(pending))
         return results

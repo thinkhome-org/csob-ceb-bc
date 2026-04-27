@@ -10,6 +10,7 @@ from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.base import StateRepository
 from csob_ceb_bc.logging import get_logger
 from csob_ceb_bc.redaction import redact_contract
+from csob_ceb_bc.metrics import MetricsCollector, timed
 
 logger = get_logger("csob_ceb_bc.downloads")
 
@@ -25,6 +26,7 @@ class DownloadManager:
         soap: SoapGateway,
         rest: RestTransferClient,
         state: StateRepository,
+        metrics: MetricsCollector | None = None,
     ) -> None:
         self._contract_number = contract_number
         self._client_app_guid = client_app_guid
@@ -33,6 +35,7 @@ class DownloadManager:
         self._soap = soap
         self._rest = rest
         self._state = state
+        self._metrics = metrics
 
     def _profile_key(self, filter: DownloadFilter) -> str:
         parts = [
@@ -72,6 +75,9 @@ class DownloadManager:
             filter=filter,
         )
         log_ctx.info("download_soap_complete", file_count=len(result.files))
+        if self._metrics:
+            self._metrics.inc("download_soap_calls")
+            self._metrics.gauge("download_file_count", len(result.files))
 
         downloaded: list[DownloadFile] = []
         has_unresolved = False
@@ -87,16 +93,25 @@ class DownloadManager:
                 continue
             if file.status == DownloadFileStatus.D and file.url:
                 local_path = target_dir / file.filename
-                self._rest.download_to_file(file.url, local_path)
+                if self._metrics:
+                    with timed(self._metrics, "download_latency_seconds"):
+                        self._rest.download_to_file(file.url, local_path)
+                else:
+                    self._rest.download_to_file(file.url, local_path)
                 downloaded.append(file)
+                if self._metrics:
+                    self._metrics.inc("download_success")
                 log_ctx.info("download_file_success", filename=file.filename, local_path=str(local_path))
 
-        if not has_unresolved and downloaded:
+        if not has_unresolved:
             self._state.set_profile_cursor(key, result.query_timestamp)
-            log_ctx.info("download_cursor_advanced", query_timestamp=result.query_timestamp.isoformat())
-        elif not has_unresolved and not downloaded:
-            # no files at all, safe to advance cursor
-            self._state.set_profile_cursor(key, result.query_timestamp)
-            log_ctx.info("download_cursor_advanced_empty", query_timestamp=result.query_timestamp.isoformat())
+            log_ctx.info(
+                "download_cursor_advanced",
+                query_timestamp=result.query_timestamp.isoformat(),
+                downloaded_count=len(downloaded),
+            )
+
+        if has_unresolved and self._metrics:
+            self._metrics.inc("download_unresolved_files", len([f for f in result.files if f.status == DownloadFileStatus.R or f.url is None]))
 
         return downloaded
