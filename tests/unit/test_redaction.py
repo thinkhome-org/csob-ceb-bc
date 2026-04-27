@@ -7,4 +7,6 @@ def test_redact_contract():
 
 
 def test_redact_url():
-    assert redact_url("https://example.com/path?token=secret") == "https://example.com/path?token=***"
+    assert (
+        redact_url("https://example.com/path?token=secret") == "https://example.com/path?token=***"
+    )

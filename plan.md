@@ -68,23 +68,26 @@
   - TODO: ověřit v dokumentaci nebo s ČSOB Helpdesk CEB aktuální dostupnost WSDL ZIP;
     při kontrole dne 2026-04-27 URL z příručky vrátila chybovou HTML stránku místo ZIP
     archivu.
-  - TODO: ověřit v dokumentaci nebo s ČSOB Helpdesk CEB, zda se v odpovědi
-    StartUploadFileList v3 pole Hash ve WSDL skutečně jmenuje a chová jako SHA256; text
-    příručky u výstupu obsahuje historickou formulaci s MD5, ale verze v3 je popsána jako
-    SHA256.
-  - TODO: ověřit v dokumentaci nebo s ČSOB Helpdesk CEB přesný název HTTP hlavičky, ve
-    které má být podle příručky identita klienta u REST služby obsažena, pokud ji
-    klientská knihovna musí nastavovat ručně. Bez potvrzení ji SDK nemá vymýšlet.
+  - ✅ Ověřeno z příručky: StartUploadFileList v3 a FinishUploadFileList v2 používají
+    SHA256 (64 hex znaků). Verze v1/v2 používaly MD5 (32 znaky). Příručka explicitně
+    uvádí "Náhrada algoritmu MD5 za SHA256".
+  - ✅ Ověřeno z příručky: REST služba nevyžaduje žádnou ručně nastavovanou HTTP hlavičku
+    pro identitu klienta. Autentizace probíhá výhradně přes mTLS certifikát.
   - TODO: ověřit v dokumentaci nebo s ČSOB Helpdesk CEB přesný minimální interval po SOAP
     Fault 1101; příručka uvádí ochranné okno 30/20 minut a upozorňuje, že soustavné
-    volání může blokaci prodlužovat.
-  - TODO: ověřit v dokumentaci nebo s ČSOB Helpdesk CEB, zda lze po expiraci download URL
-    získat novou URL opakováním GetDownloadFileList, nebo se má stav považovat za
-    konečný.
+    volání může blokaci prodlužovat. Doporučený běžný polling interval: 60 s nebo delší.
+  - ✅ Ověřeno z příručky: Po expiraci download URL (HTTP 400/404, platnost 15 dní) se
+    jedná o permanentní chybu ("NOK, konec"). Opakování GetDownloadFileList nevrátí
+    novou URL pro tentýž soubor.
   - TODO: ověřit v dokumentaci nebo s ČSOB Helpdesk CEB přesné časování generování
-    importních protokolů po stavu I.
+    importních protokolů po stavu I. Příručka pouze uvádí, že zpracování je asynchronní.
   - TODO: ověřit v dokumentaci nebo s ČSOB Helpdesk CEB kompletní XSD a formátové
     specifikace výpisů, avíz a platebních dávek mimo rozsah této příručky.
+  - ⚠️ Ambiguity v příručce: V kapitole 3.3.2.1 (Multipart upload) se v příkladu objevuje
+    `Content-Disposition: form-data; name="fileupload"; filename="..."`, ale v tabulce
+    MIME part headerů je uvedeno `Content-Disposition: attachment; filename="..."`.
+    SDK používá `form-data` přes httpx, což odpovídá prvnímu příkladu a běžnému
+    multipart chování HTTP knihoven.
 
   ## 3. Doporučené Cíle SDK
 

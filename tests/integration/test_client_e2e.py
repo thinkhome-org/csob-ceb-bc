@@ -1,4 +1,5 @@
 """Lightweight integration test using mocked SOAP/REST."""
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -42,14 +43,13 @@ def test_full_download_upload_flow(mock_soap, mock_rest, mock_state, mock_cert, 
     client = BusinessConnectorClient.from_config(_config())
 
     # Act & Assert: list files
-    soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=None, files=[]
-    )
+    soap.get_download_file_list_v4.return_value = MagicMock(query_timestamp=None, files=[])
     files = client.list_available_files(DownloadFilter())
     assert files == []
 
     # Act & Assert: upload
     from csob_ceb_bc.models import RestUploadResult, UploadFinishStatus, UploadStartStatus
+
     soap.start_upload_file_list_v3.return_value = [
         MagicMock(filename="pay.xml", status=UploadStartStatus.U, url="https://up", ticket_id="T1")
     ]

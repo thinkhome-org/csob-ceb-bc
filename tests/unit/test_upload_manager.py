@@ -96,7 +96,12 @@ def test_upload_idempotent_skip(repo: SqliteStateRepository, tmp_path: Path):
     file_path.write_text("<payments/>")
     sha = hashlib.sha256(b"<payments/>").hexdigest()
     repo.create_upload_attempt(
-        attempt_id="a1", filename="pay.xml", file_hash=sha, size=12, file_format="XML SEPA", mode="AllOrNothing"
+        attempt_id="a1",
+        filename="pay.xml",
+        file_hash=sha,
+        size=12,
+        file_format="XML SEPA",
+        mode="AllOrNothing",
     )
     repo.mark_idempotency_key(sha, "a1")
 
@@ -256,3 +261,295 @@ def test_resume_pending_with_metrics(repo: SqliteStateRepository, tmp_path: Path
     assert len(results) == 1
     assert metrics.counter_value("upload_resume_success") == 1
     assert metrics.gauge_value("upload_pending_count") == 1.0
+
+
+def test_resume_pending_from_start_url(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+    repo.create_upload_attempt(
+        attempt_id="a1",
+        filename=str(file_path),
+        file_hash="abc",
+        size=1,
+        file_format="XML SEPA",
+        mode="AllOrNothing",
+    )
+    repo.save_upload_start_url("a1", "https://example.com/upload")
+
+    rest = MagicMock()
+    from csob_ceb_bc.models import RestUploadResult
+
+    rest.upload_multipart.return_value = RestUploadResult(
+        status="201", ext_file_url="", new_file_id="NFID-resume"
+    )
+
+    soap = MagicMock()
+    soap.finish_upload_file_list_v2.return_value = [
+        MagicMock(filename=str(file_path), hash="abc", status=UploadFinishStatus.I, ticket_id="T2")
+    ]
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=soap,
+        rest=rest,
+        state=repo,
+    )
+    results = mgr.resume_pending()
+    assert len(results) == 1
+    rest.upload_multipart.assert_called_once_with(
+        url="https://example.com/upload", file=file_path, filename=str(file_path)
+    )
+
+
+def test_resume_pending_start_url_rest_fails(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+    repo.create_upload_attempt(
+        attempt_id="a1",
+        filename=str(file_path),
+        file_hash="abc",
+        size=1,
+        file_format="XML SEPA",
+        mode="AllOrNothing",
+    )
+    repo.save_upload_start_url("a1", "https://example.com/upload")
+
+    rest = MagicMock()
+    rest.upload_multipart.side_effect = Exception("network error")
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=MagicMock(),
+        rest=rest,
+        state=repo,
+    )
+    results = mgr.resume_pending()
+    assert len(results) == 0
+
+
+def test_upload_finish_permanent_soap_fault(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+
+    soap = MagicMock()
+    rest = MagicMock()
+    from csob_ceb_bc.errors import CsobBCSoapFault
+    from csob_ceb_bc.models import RestUploadResult
+
+    soap.start_upload_file_list_v3.return_value = [
+        MagicMock(filename="pay.xml", status=UploadStartStatus.U, url="https://up", ticket_id="T2")
+    ]
+    rest.upload_multipart.return_value = RestUploadResult(
+        status="201", ext_file_url="", new_file_id="NFID-1"
+    )
+    soap.finish_upload_file_list_v2.side_effect = CsobBCSoapFault(
+        "Blocked", permanent=True, ticket_id="T-FAULT"
+    )
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=soap,
+        rest=rest,
+        state=repo,
+    )
+    result = mgr.upload_payment_batch(
+        file=file_path,
+        metadata=UploadFile(filename="pay.xml", format="XML SEPA", mode=UploadMode.AllOrNothing),
+    )
+    assert result is None
+
+
+def test_upload_empty_finish_results(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+
+    soap = MagicMock()
+    rest = MagicMock()
+    from csob_ceb_bc.models import RestUploadResult
+
+    soap.start_upload_file_list_v3.return_value = [
+        MagicMock(filename="pay.xml", status=UploadStartStatus.U, url="https://up", ticket_id="T2")
+    ]
+    rest.upload_multipart.return_value = RestUploadResult(
+        status="201", ext_file_url="", new_file_id="NFID-1"
+    )
+    soap.finish_upload_file_list_v2.return_value = []
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=soap,
+        rest=rest,
+        state=repo,
+    )
+    result = mgr.upload_payment_batch(
+        file=file_path,
+        metadata=UploadFile(filename="pay.xml", format="XML SEPA", mode=UploadMode.AllOrNothing),
+    )
+    assert result is None
+
+
+def test_resume_pending_permanent_rest_error(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+    repo.create_upload_attempt(
+        attempt_id="a1",
+        filename=str(file_path),
+        file_hash="abc",
+        size=1,
+        file_format="XML SEPA",
+        mode="AllOrNothing",
+    )
+    repo.save_upload_start_url("a1", "https://example.com/upload")
+
+    from csob_ceb_bc.errors import CsobBCHttpError
+
+    rest = MagicMock()
+    rest.upload_multipart.side_effect = CsobBCHttpError(
+        "Forbidden", operation="upload", permanent=True, retryable=False
+    )
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=MagicMock(),
+        rest=rest,
+        state=repo,
+    )
+    results = mgr.resume_pending()
+    assert len(results) == 0
+    finish = repo.get_upload_attempt("a1")
+    assert finish["status"] == "finish_R"
+
+
+def test_resume_pending_permanent_finish_fault(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+    repo.create_upload_attempt(
+        attempt_id="a1",
+        filename=str(file_path),
+        file_hash="abc",
+        size=1,
+        file_format="XML SEPA",
+        mode="AllOrNothing",
+    )
+    repo.save_upload_new_file_id("a1", "NFID-1")
+
+    from csob_ceb_bc.errors import CsobBCSoapFault
+
+    soap = MagicMock()
+    soap.finish_upload_file_list_v2.side_effect = CsobBCSoapFault(
+        "Blocked", permanent=True, ticket_id="T-FAULT"
+    )
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=soap,
+        rest=MagicMock(),
+        state=repo,
+    )
+    results = mgr.resume_pending()
+    assert len(results) == 0
+    finish = repo.get_upload_attempt("a1")
+    assert finish["status"] == "finish_R"
+
+
+def test_upload_finish_retryable_soap_fault_raised(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+
+    soap = MagicMock()
+    rest = MagicMock()
+    from csob_ceb_bc.errors import CsobBCSoapFault
+    from csob_ceb_bc.models import RestUploadResult
+
+    soap.start_upload_file_list_v3.return_value = [
+        MagicMock(filename="pay.xml", status=UploadStartStatus.U, url="https://up", ticket_id="T2")
+    ]
+    rest.upload_multipart.return_value = RestUploadResult(
+        status="201", ext_file_url="", new_file_id="NFID-1"
+    )
+    soap.finish_upload_file_list_v2.side_effect = CsobBCSoapFault(
+        "Busy", permanent=False, ticket_id="T-FAULT"
+    )
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=soap,
+        rest=rest,
+        state=repo,
+    )
+    with pytest.raises(CsobBCSoapFault):
+        mgr.upload_payment_batch(
+            file=file_path,
+            metadata=UploadFile(
+                filename="pay.xml", format="XML SEPA", mode=UploadMode.AllOrNothing
+            ),
+        )
+
+
+def test_resume_pending_retryable_rest_error_continues(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+    repo.create_upload_attempt(
+        attempt_id="a1",
+        filename=str(file_path),
+        file_hash="abc",
+        size=1,
+        file_format="XML SEPA",
+        mode="AllOrNothing",
+    )
+    repo.save_upload_start_url("a1", "https://example.com/upload")
+
+    from csob_ceb_bc.errors import CsobBCHttpError
+
+    rest = MagicMock()
+    rest.upload_multipart.side_effect = CsobBCHttpError(
+        "Server Error", operation="upload", permanent=False, retryable=True
+    )
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=MagicMock(),
+        rest=rest,
+        state=repo,
+    )
+    results = mgr.resume_pending()
+    assert len(results) == 0
+
+
+def test_resume_pending_retryable_finish_fault_raised(repo: SqliteStateRepository, tmp_path: Path):
+    file_path = tmp_path / "pay.xml"
+    file_path.write_text("<payments/>")
+    repo.create_upload_attempt(
+        attempt_id="a1",
+        filename=str(file_path),
+        file_hash="abc",
+        size=1,
+        file_format="XML SEPA",
+        mode="AllOrNothing",
+    )
+    repo.save_upload_new_file_id("a1", "NFID-1")
+
+    from csob_ceb_bc.errors import CsobBCSoapFault
+
+    soap = MagicMock()
+    soap.finish_upload_file_list_v2.side_effect = CsobBCSoapFault(
+        "Busy", permanent=False, ticket_id="T-FAULT"
+    )
+
+    mgr = UploadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        soap=soap,
+        rest=MagicMock(),
+        state=repo,
+    )
+    with pytest.raises(CsobBCSoapFault):
+        mgr.resume_pending()

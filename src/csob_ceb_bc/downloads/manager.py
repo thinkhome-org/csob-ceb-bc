@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from csob_ceb_bc.logging import get_logger
@@ -44,9 +45,24 @@ class DownloadManager:
         ]
         if filter.file_types:
             parts.append("_".join(sorted(ft.value for ft in filter.file_types)))
-        return ":".join(parts)
+        if filter.file_formats:
+            parts.append("_".join(sorted(filter.file_formats)))
+        if filter.filename:
+            parts.append(filter.filename)
+        if filter.created_after is not None:
+            parts.append(filter.created_after.isoformat())
+        if filter.created_before is not None:
+            parts.append(filter.created_before.isoformat())
+        raw = ":".join(parts)
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    def _ensure_filter_guid(self, filter: DownloadFilter) -> DownloadFilter:
+        if filter.client_app_guid is None:
+            return filter.model_copy(update={"client_app_guid": self._client_app_guid})
+        return filter
 
     def list_available_files(self, filter: DownloadFilter) -> list[DownloadFile]:
+        filter = self._ensure_filter_guid(filter)
         key = self._profile_key(filter)
         prev = self._state.get_profile_cursor(key)
         result = self._soap.get_download_file_list_v4(
@@ -60,7 +76,10 @@ class DownloadManager:
         filter: DownloadFilter,
         target_dir: Path,
     ) -> list[DownloadFile]:
+        from csob_ceb_bc.errors import CsobBCHttpError
+
         target_dir.mkdir(parents=True, exist_ok=True)
+        filter = self._ensure_filter_guid(filter)
         key = self._profile_key(filter)
         prev = self._state.get_profile_cursor(key)
         log_ctx = logger.bind(
@@ -95,11 +114,21 @@ class DownloadManager:
                 continue
             if file.status == DownloadFileStatus.D and file.url:
                 local_path = target_dir / file.filename
-                if self._metrics:
-                    with timed(self._metrics, "download_latency_seconds"):
+                try:
+                    if self._metrics:
+                        with timed(self._metrics, "download_latency_seconds"):
+                            self._rest.download_to_file(file.url, local_path)
+                    else:
                         self._rest.download_to_file(file.url, local_path)
-                else:
-                    self._rest.download_to_file(file.url, local_path)
+                except CsobBCHttpError as exc:
+                    if exc.permanent:
+                        log_ctx.warning(
+                            "download_file_permanent_rest_error",
+                            filename=file.filename,
+                            error=exc.safe_message,
+                        )
+                        continue
+                    raise
                 downloaded.append(file)
                 if self._metrics:
                     self._metrics.inc("download_success")
@@ -119,8 +148,7 @@ class DownloadManager:
 
         if has_unresolved and self._metrics:
             unresolved = [
-                f for f in result.files
-                if f.status == DownloadFileStatus.R or f.url is None
+                f for f in result.files if f.status == DownloadFileStatus.R or f.url is None
             ]
             self._metrics.inc("download_unresolved_files", len(unresolved))
 

@@ -88,6 +88,14 @@ class SqliteStateRepository(StateRepository):
             d["new_file_id"] = rest["new_file_id"]
         return d
 
+    def save_upload_start_url(self, attempt_id: str, start_url: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE upload_attempts SET start_url = ?, updated_at = "
+                "CURRENT_TIMESTAMP WHERE attempt_id = ?",
+                (start_url, attempt_id),
+            )
+
     def save_upload_new_file_id(self, attempt_id: str, new_file_id: str) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -96,7 +104,8 @@ class SqliteStateRepository(StateRepository):
                 (attempt_id, new_file_id),
             )
             conn.execute(
-                "UPDATE upload_attempts SET status = ? WHERE attempt_id = ?",
+                "UPDATE upload_attempts SET status = ?, updated_at = "
+                "CURRENT_TIMESTAMP WHERE attempt_id = ?",
                 ("rest_done", attempt_id),
             )
 
@@ -110,7 +119,8 @@ class SqliteStateRepository(StateRepository):
                 (attempt_id, finish_status, ticket_id),
             )
             conn.execute(
-                "UPDATE upload_attempts SET status = ? WHERE attempt_id = ?",
+                "UPDATE upload_attempts SET status = ?, updated_at = "
+                "CURRENT_TIMESTAMP WHERE attempt_id = ?",
                 (f"finish_{finish_status}", attempt_id),
             )
 
@@ -148,14 +158,18 @@ class SqliteStateRepository(StateRepository):
             )
 
     def get_pending_uploads(self) -> list[dict[str, Any]]:
-        """Return uploads in 'rest_done' state without finish result."""
+        """Return uploads in 'rest_done' state without finish result,
+        or 'started' state with a start_url but no rest result."""
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT a.attempt_id, a.filename, a.file_hash,
-                           a.file_format, a.mode, r.new_file_id
+                           a.file_format, a.mode, a.start_url, r.new_file_id
                     FROM upload_attempts a
-                    JOIN upload_rest_results r ON a.attempt_id = r.attempt_id
+                    LEFT JOIN upload_rest_results r ON a.attempt_id = r.attempt_id
                     LEFT JOIN upload_finish_results f ON a.attempt_id = f.attempt_id
-                    WHERE a.status = 'rest_done' AND f.id IS NULL"""
+                    WHERE (
+                        (a.status = 'rest_done' AND f.id IS NULL)
+                        OR (a.status = 'started' AND a.start_url IS NOT NULL AND r.id IS NULL)
+                    )"""
             ).fetchall()
         return [dict(row) for row in rows]

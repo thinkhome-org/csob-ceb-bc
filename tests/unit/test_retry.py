@@ -12,11 +12,13 @@ from csob_ceb_bc.retry import retry_rest, retry_soap
 
 
 def test_retry_soap_eventually_succeeds():
-    mock = MagicMock(side_effect=[
-        CsobBCRetryableError("temp fail"),
-        CsobBCRetryableError("temp fail"),
-        "success",
-    ])
+    mock = MagicMock(
+        side_effect=[
+            CsobBCRetryableError("temp fail"),
+            CsobBCRetryableError("temp fail"),
+            "success",
+        ]
+    )
 
     @retry_soap(max_attempts=3)
     def call():
@@ -55,9 +57,7 @@ def test_retry_rest_reraises_permanent():
 
 def test_retry_soap_skips_permanent():
     mock = MagicMock(
-        side_effect=CsobBCSoapFault(
-            "blocked", fault_code="1012", permanent=True, retryable=False
-        )
+        side_effect=CsobBCSoapFault("blocked", fault_code="1012", permanent=True, retryable=False)
     )
 
     @retry_soap(max_attempts=3)
@@ -67,3 +67,17 @@ def test_retry_soap_skips_permanent():
     with pytest.raises(CsobBCSoapFault):
         call()
     assert mock.call_count == 1
+
+
+def test_retry_soap_retries_retryable_fault():
+    mock = MagicMock(
+        side_effect=CsobBCSoapFault("temp", fault_code="1000", permanent=False, retryable=True)
+    )
+
+    @retry_soap(max_attempts=2)
+    def call():
+        raise mock()
+
+    with pytest.raises(CsobBCSoapFault):
+        call()
+    assert mock.call_count == 2

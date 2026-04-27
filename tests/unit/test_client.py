@@ -45,3 +45,28 @@ def test_list_available_files_delegates(mock_cert, mock_state, mock_rest, mock_s
     result = client.list_available_files(DownloadFilter())
     assert result == []
     dm.list_available_files.assert_called_once()
+
+
+@patch("csob_ceb_bc.client.SoapGateway")
+@patch("csob_ceb_bc.client.RestTransferClient")
+@patch("csob_ceb_bc.client.SqliteStateRepository")
+@patch("csob_ceb_bc.client.CertificateStore")
+@patch("csob_ceb_bc.client.TokenBucketRateLimiter")
+def test_from_config_production_creates_rate_limiter(
+    mock_rl, mock_cert, mock_state, mock_rest, mock_soap
+):
+    mock_cert_instance = MagicMock()
+    mock_cert_instance.cert_path.read_bytes.return_value = b"cert"
+    mock_cert.return_value = mock_cert_instance
+    config = ConnectorConfig(
+        environment=Environment.PRODUCTION,
+        contract_number="123456",
+        client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        certificate=CertificateConfig(
+            cert_file=Path("/dev/null"),
+            key_file=Path("/dev/null"),
+        ),
+    )
+    client = BusinessConnectorClient.from_config(config)
+    assert client is not None
+    mock_rl.assert_called_once()

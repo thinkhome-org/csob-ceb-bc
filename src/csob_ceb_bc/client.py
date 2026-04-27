@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from csob_ceb_bc.certificates.store import CertificateStore
-from csob_ceb_bc.config import ConnectorConfig
+from csob_ceb_bc.config import ConnectorConfig, Environment
 from csob_ceb_bc.downloads.manager import DownloadManager
 from csob_ceb_bc.import_protocols.manager import ImportProtocolManager
 from csob_ceb_bc.metrics import MetricsCollector
@@ -64,7 +64,9 @@ class BusinessConnectorClient:
             metrics=self._metrics,
         )
         self._import_protocol_manager = ImportProtocolManager(
+            contract_number=config.contract_number,
             client_app_guid=config.client_app_guid,
+            environment=config.environment.value,
             soap=soap,
             rest=rest,
             state=state,
@@ -74,13 +76,16 @@ class BusinessConnectorClient:
     @classmethod
     def from_config(cls, config: ConnectorConfig) -> BusinessConnectorClient:
         cert_store = CertificateStore(config.certificate)
+        cert_store.validate_certificate()
         cert_store.validate_not_expiring()
         state = SqliteStateRepository(config.state_url)
-        rate_limiter = TokenBucketRateLimiter(
-            capacity=config.rate_limit.soap_calls,
-            refill_per_second=config.rate_limit.soap_calls / config.rate_limit.per_seconds,
-        )
-        soap = SoapGateway(config, rate_limiter=rate_limiter)
+        rate_limiter = None
+        if config.environment != Environment.DEMO:
+            rate_limiter = TokenBucketRateLimiter(
+                capacity=config.rate_limit.soap_calls,
+                refill_per_second=config.rate_limit.soap_calls / config.rate_limit.per_seconds,
+            )
+        soap = SoapGateway(config, rate_limiter=rate_limiter, cert_store=cert_store)
         rest = RestTransferClient(
             cert_store=cert_store,
             timeout=None,  # uses defaults

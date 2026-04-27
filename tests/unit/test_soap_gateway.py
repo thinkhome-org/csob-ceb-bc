@@ -10,7 +10,6 @@ from csob_ceb_bc.errors import (
     CsobBCPermanentError,
     CsobBCRateLimitError,
     CsobBCRetryableError,
-    CsobBCSoapFault,
 )
 from csob_ceb_bc.models import DownloadFilter, UploadFile, UploadMode
 from csob_ceb_bc.soap.gateway import SoapGateway
@@ -187,20 +186,20 @@ def test_finish_upload_file_list_v2(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
     mock_client.service.FinishUploadFileList.return_value = {
-        "FileStatus": [
-            {
-                "Filename": "pay.xml",
-                "Hash": "a" * 64,
-                "Status": "I",
-                "TicketId": "T-100",
-            }
-        ]
+        "FileList": {
+            "FileStatus": [
+                {
+                    "Filename": "pay.xml",
+                    "Hash": "a" * 64,
+                    "Status": "I",
+                    "TicketId": "T-100",
+                }
+            ]
+        }
     }
 
     gw = SoapGateway(_config(), wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"))
-    result = gw.finish_upload_file_list_v2(
-        files=[("pay.xml", "a" * 64, "NFID-123")]
-    )
+    result = gw.finish_upload_file_list_v2(files=[("pay.xml", "a" * 64, "NFID-123")])
     assert len(result) == 1
     assert result[0].filename == "pay.xml"
     assert result[0].status == "I"
@@ -212,18 +211,18 @@ def test_finish_upload_single_status_not_list(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
     mock_client.service.FinishUploadFileList.return_value = {
-        "FileStatus": {
-            "Filename": "pay.xml",
-            "Hash": "a" * 64,
-            "Status": "R",
-            "TicketId": "T-101",
+        "FileList": {
+            "FileStatus": {
+                "Filename": "pay.xml",
+                "Hash": "a" * 64,
+                "Status": "R",
+                "TicketId": "T-101",
+            }
         }
     }
 
     gw = SoapGateway(_config(), wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"))
-    result = gw.finish_upload_file_list_v2(
-        files=[("pay.xml", "a" * 64, "NFID-123")]
-    )
+    result = gw.finish_upload_file_list_v2(files=[("pay.xml", "a" * 64, "NFID-123")])
     assert len(result) == 1
     assert result[0].status == "R"
 
@@ -266,3 +265,101 @@ def test_setup_transport_with_ca_bundle(mock_client_cls: MagicMock):
     gw = SoapGateway(config, wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"))
     session = gw._client.transport.session
     assert session.verify == str(config.certificate.ca_bundle)
+
+
+@patch("csob_ceb_bc.soap.gateway.zeep.Client")
+def test_get_download_file_list_v4_full_filter(mock_client_cls: MagicMock):
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.service.GetDownloadFileList.return_value = {
+        "QueryTimestamp": "2025-01-15T10:00:00+01:00",
+        "TicketId": "T-FULL",
+        "FileList": None,
+    }
+
+    gw = SoapGateway(_config(), wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"))
+    from datetime import UTC
+
+    result = gw.get_download_file_list_v4(
+        filter=DownloadFilter(
+            file_types=["VYPIS"],
+            file_formats=["PDF", "CSV"],
+            filename="stmt",
+            created_after=datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC),
+            created_before=datetime(2025, 1, 20, 0, 0, 0, tzinfo=UTC),
+            client_app_guid="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        ),
+    )
+    call_args = mock_client.service.GetDownloadFileList.call_args[1]
+    assert call_args["Filter"]["FileTypes"] == {"FileType": ["VYPIS"]}
+    assert call_args["Filter"]["FileFormats"] == {"FileFormat": ["PDF", "CSV"]}
+    assert call_args["Filter"]["FileName"] == "stmt"
+    assert call_args["Filter"]["CreatedAfter"] == "2025-01-01T00:00:00+00:00"
+    assert call_args["Filter"]["CreatedBefore"] == "2025-01-20T00:00:00+00:00"
+    assert call_args["Filter"]["ClientAppGuid"] == "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    assert result.ticket_id == "T-FULL"
+
+
+@patch("csob_ceb_bc.soap.gateway.zeep.Client")
+def test_setup_transport_with_cert_store(mock_client_cls: MagicMock):
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    from csob_ceb_bc.certificates.store import CertificateStore
+
+    config = _config_with_ca()
+    store = CertificateStore(config.certificate)
+    gw = SoapGateway(config, wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"), cert_store=store)
+    session = gw._client.transport.session
+    assert session.cert == (str(store.cert_path), str(store.key_path))
+    assert session.verify == str(config.certificate.ca_bundle)
+
+
+@patch("csob_ceb_bc.soap.gateway.zeep.Client")
+def test_get_download_file_list_v4_single_file_detail(mock_client_cls: MagicMock):
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.service.GetDownloadFileList.return_value = {
+        "QueryTimestamp": "2025-01-15T10:00:00+01:00",
+        "FileList": {
+            "FileDetail": {
+                "Filename": "stmt.pdf",
+                "Type": "VYPIS",
+                "Format": "PDF",
+                "CreationDateTime": "2025-01-14T09:00:00+01:00",
+                "Size": 1024,
+                "UploadFileHash": None,
+                "Status": "D",
+                "TicketId": "T-SINGLE",
+            }
+        },
+    }
+    gw = SoapGateway(_config(), wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"))
+    result = gw.get_download_file_list_v4()
+    assert len(result.files) == 1
+    assert result.files[0].ticket_id == "T-SINGLE"
+
+
+@patch("csob_ceb_bc.soap.gateway.zeep.Client")
+def test_get_download_file_list_v4_unparseable_creation_date(mock_client_cls: MagicMock):
+    from csob_ceb_bc.errors import CsobBCProtocolError
+
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.service.GetDownloadFileList.return_value = {
+        "QueryTimestamp": "2025-01-15T10:00:00+01:00",
+        "FileList": {
+            "FileDetail": {
+                "Filename": "stmt.pdf",
+                "Type": "VYPIS",
+                "Format": "PDF",
+                "CreationDateTime": "not-a-date",
+                "Size": 1024,
+                "UploadFileHash": None,
+                "Status": "D",
+            }
+        },
+    }
+    gw = SoapGateway(_config(), wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"))
+    with pytest.raises(CsobBCProtocolError) as exc_info:
+        gw.get_download_file_list_v4()
+    assert "CreationDateTime" in str(exc_info.value)

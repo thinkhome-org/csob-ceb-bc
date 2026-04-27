@@ -68,3 +68,10 @@ class ConnectorConfig(BaseSettings):
         if not v:
             raise ValueError("client_app_guid is required")
         return v
+
+    @field_validator("contract_number")
+    @classmethod
+    def _contract_not_empty(cls, v: str) -> str:
+        if not v:
+            raise ValueError("contract_number is required")
+        return v

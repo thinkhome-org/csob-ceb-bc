@@ -36,11 +36,10 @@ def _store() -> CertificateStore:
 # REST Transfer edge cases
 # ---------------------------------------------------------------------------
 
+
 @respx.mock
 def test_upload_multipart_malformed_json():
-    respx.post("https://example.com/upload").mock(
-        return_value=httpx.Response(200, text="not-json")
-    )
+    respx.post("https://example.com/upload").mock(return_value=httpx.Response(200, text="not-json"))
     client = RestTransferClient(cert_store=_store())
     file_path = FIXTURES / "certs" / "test.pem"
     with pytest.raises(CsobBCProtocolError) as exc_info:
@@ -66,8 +65,9 @@ def test_download_connection_timeout(tmp_path: Path):
         side_effect=httpx.ConnectTimeout("Connection timed out")
     )
     client = RestTransferClient(cert_store=_store())
-    with pytest.raises(httpx.ConnectTimeout):
+    with pytest.raises(CsobBCHttpError) as exc_info:
         client.download_to_file("https://example.com/file", tmp_path / "out.bin")
+    assert exc_info.value.retryable is True
     assert route.called
 
 
@@ -77,8 +77,9 @@ def test_download_read_timeout(tmp_path: Path):
         side_effect=httpx.ReadTimeout("Read timed out")
     )
     client = RestTransferClient(cert_store=_store())
-    with pytest.raises(httpx.ReadTimeout):
+    with pytest.raises(CsobBCHttpError) as exc_info:
         client.download_to_file("https://example.com/file", tmp_path / "out.bin")
+    assert exc_info.value.retryable is True
     assert route.called
 
 
@@ -107,6 +108,7 @@ def test_download_503_retryable():
 # ---------------------------------------------------------------------------
 # Certificate edge cases
 # ---------------------------------------------------------------------------
+
 
 def test_certificate_missing_file():
     with pytest.raises(CsobBCCertificateError) as exc_info:
@@ -154,6 +156,7 @@ def test_certificate_expires_soon(tmp_path: Path):
 # SOAP Gateway edge cases
 # ---------------------------------------------------------------------------
 
+
 def test_soap_gateway_invalid_datetime_parsing(monkeypatch):
     config = MagicMock()
     config.environment = "DEMO"
@@ -180,3 +183,16 @@ def test_soap_gateway_extract_ticket_id():
     assert gateway._extract_ticket_id({"TicketId": "T-123"}) == "T-123"
     assert gateway._extract_ticket_id({"ticketId": "T-456"}) == "T-456"
     assert gateway._extract_ticket_id("not-a-dict") is None
+
+
+@respx.mock
+def test_upload_connection_timeout():
+    route = respx.post("https://example.com/upload").mock(
+        side_effect=httpx.ConnectTimeout("Connection timed out")
+    )
+    client = RestTransferClient(cert_store=_store())
+    file_path = FIXTURES / "certs" / "test.pem"
+    with pytest.raises(CsobBCHttpError) as exc_info:
+        client.upload_multipart("https://example.com/upload", file_path, "test.pem")
+    assert exc_info.value.retryable is True
+    assert route.called

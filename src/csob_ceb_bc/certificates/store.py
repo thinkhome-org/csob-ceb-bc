@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ssl
 import tempfile
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -42,7 +42,7 @@ class CertificateStore:
 
         pfx_path = self._config.pfx_file
         if pfx_path is None:
-            raise CsobBCCertificateError("pfx_file is None")
+            raise CsobBCCertificateError("pfx_file is None")  # pragma: no cover
         password_env = self._config.pfx_password_env or "CSOB_BC_PFX_PASSWORD"
         password = os.environ.get(password_env, "").encode() or None
 
@@ -62,9 +62,7 @@ class CertificateStore:
             self.cert_path = base / "cert.pem"
             self.key_path = base / "key.pem"
 
-            self.cert_path.write_bytes(
-                cert.public_bytes(serialization.Encoding.PEM)
-            )
+            self.cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
             self.key_path.write_bytes(
                 private_key.private_bytes(
                     encoding=serialization.Encoding.PEM,
@@ -80,8 +78,6 @@ class CertificateStore:
         try:
             pem = self.cert_path.read_bytes()
             cert = x509.load_pem_x509_certificate(pem, default_backend())
-            from datetime import datetime
-
             if cert.not_valid_after_utc is None:
                 raise CsobBCCertificateError("Certificate has no expiry date")
             days_left = (cert.not_valid_after_utc - datetime.now(UTC)).days
@@ -96,6 +92,70 @@ class CertificateStore:
         except Exception as exc:
             raise CsobBCCertificateError(f"Certificate validation failed: {exc}") from exc
 
+    def validate_certificate(self) -> None:
+        """Verify certificate meets ČSOB requirements (SHA256+, RSA 2048+, KU/EKU if present)."""
+        try:
+            pem = self.cert_path.read_bytes()
+            cert = x509.load_pem_x509_certificate(pem, default_backend())
+
+            # Signature algorithm must be SHA256 or stronger
+            hash_alg = cert.signature_hash_algorithm
+            if hash_alg is None or hash_alg.digest_size < 32:
+                raise CsobBCCertificateError(
+                    "Certificate signature must be SHA256 or stronger",
+                    permanent=True,
+                    retryable=False,
+                )
+
+            # Key must be RSA 2048+
+            public_key = cert.public_key()
+            if not hasattr(public_key, "key_size"):
+                raise CsobBCCertificateError(
+                    "Certificate public key must be RSA",
+                    permanent=True,
+                    retryable=False,
+                )
+            if public_key.key_size < 2048:
+                raise CsobBCCertificateError(
+                    f"RSA key size must be at least 2048 bits, got {public_key.key_size}",
+                    permanent=True,
+                    retryable=False,
+                )
+
+            # Key Usage (if present): Digital Signature or Key Encipherment
+            try:
+                key_usage = cert.extensions.get_extension_for_class(x509.KeyUsage)
+                if not (key_usage.value.digital_signature or key_usage.value.key_encipherment):
+                    raise CsobBCCertificateError(
+                        "Certificate KeyUsage must include DigitalSignature or KeyEncipherment",
+                        permanent=True,
+                        retryable=False,
+                    )
+            except x509.ExtensionNotFound:
+                pass
+
+            # Extended Key Usage (if present): Client Authentication
+            try:
+                eku = cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
+                client_auth_oid = x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH
+                if client_auth_oid not in eku.value:
+                    raise CsobBCCertificateError(
+                        "Certificate ExtendedKeyUsage must include Client Authentication",
+                        permanent=True,
+                        retryable=False,
+                    )
+            except x509.ExtensionNotFound:
+                pass
+
+        except CsobBCCertificateError:
+            raise
+        except Exception as exc:
+            raise CsobBCCertificateError(
+                f"Certificate validation failed: {exc}",
+                permanent=True,
+                retryable=False,
+            ) from exc
+
     def _build_ssl_context(self, verify: bool | str = True) -> ssl.SSLContext:
         if verify is False:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -107,6 +167,7 @@ class CertificateStore:
                 context.load_verify_locations(verify)
             elif self._config.ca_bundle:
                 context.load_verify_locations(str(self._config.ca_bundle))
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(str(self.cert_path), str(self.key_path))
         return context
 

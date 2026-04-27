@@ -1,6 +1,7 @@
 """Tests for PFX/P12 certificate extraction."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -57,3 +58,21 @@ def test_pfx_invalid_data(tmp_path: Path):
             )
         )
     assert "Failed to load PFX" in str(exc_info.value)
+
+
+def test_pfx_missing_key_or_cert(tmp_path: Path):
+    bad_pfx = tmp_path / "empty.pfx"
+    bad_pfx.write_bytes(b"not a valid pfx")
+    with (
+        pytest.raises(CsobBCCertificateError) as exc_info,
+        patch(
+            "cryptography.hazmat.primitives.serialization.pkcs12.load_key_and_certificates",
+            return_value=(None, None, None),
+        ),
+    ):
+        CertificateStore(
+            CertificateConfig(
+                pfx_file=bad_pfx,
+            )
+        )
+    assert "does not contain key or certificate" in str(exc_info.value)

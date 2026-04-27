@@ -20,7 +20,7 @@ def repo(tmp_path: Path):
     return SqliteStateRepository(f"sqlite:///{tmp_path}/state.db")
 
 
-def test_profile_key_includes_contract_and_filter():
+def test_profile_key_is_sha256():
     mgr = DownloadManager(
         contract_number="123456",
         client_app_guid="guid",
@@ -31,9 +31,13 @@ def test_profile_key_includes_contract_and_filter():
         state=MagicMock(),
     )
     key = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
-    assert "123456" in key
-    assert "VYPIS" in key
-    assert "production" in key
+    assert len(key) == 64
+    # Same inputs produce same hash
+    key2 = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
+    assert key == key2
+    # Different inputs produce different hash
+    key3 = mgr._profile_key(DownloadFilter())
+    assert key != key3
 
 
 def test_cursor_not_advanced_when_file_status_r(repo: SqliteStateRepository, tmp_path: Path):
@@ -228,3 +232,117 @@ def test_download_unresolved_metrics(repo: SqliteStateRepository, tmp_path: Path
     )
     mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
     assert metrics.counter_value("download_unresolved_files") == 1
+
+
+def test_profile_key_with_all_filter_fields():
+    mgr = DownloadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        cert_fingerprint="fp",
+        environment="production",
+        soap=MagicMock(),
+        rest=MagicMock(),
+        state=MagicMock(),
+    )
+    dt = datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC)
+    key = mgr._profile_key(
+        DownloadFilter(
+            file_types=[DownloadFileType.VYPIS],
+            file_formats=["PDF", "CSV"],
+            filename="stmt",
+            created_after=dt,
+            created_before=dt,
+        )
+    )
+    assert len(key) == 64
+
+
+def test_ensure_filter_guid_already_present():
+    mgr = DownloadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        cert_fingerprint="fp",
+        environment="production",
+        soap=MagicMock(),
+        rest=MagicMock(),
+        state=MagicMock(),
+    )
+    f = DownloadFilter(client_app_guid="already-set")
+    result = mgr._ensure_filter_guid(f)
+    assert result.client_app_guid == "already-set"
+
+
+def test_download_permanent_rest_error_skipped(repo: SqliteStateRepository, tmp_path: Path):
+    from csob_ceb_bc.errors import CsobBCHttpError
+
+    soap = MagicMock()
+    rest = MagicMock()
+    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
+    soap.get_download_file_list_v4.return_value = MagicMock(
+        query_timestamp=ts,
+        files=[
+            DownloadFile(
+                filename="stmt.pdf",
+                type=DownloadFileType.VYPIS,
+                format="PDF",
+                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
+                size=1024,
+                status=DownloadFileStatus.D,
+                url="https://example.com/stmt.pdf",
+                upload_file_hash=None,
+            )
+        ],
+    )
+    rest.download_to_file.side_effect = CsobBCHttpError(
+        "Not Found", operation="download", permanent=True, retryable=False
+    )
+    mgr = DownloadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        cert_fingerprint="fp",
+        environment="production",
+        soap=soap,
+        rest=rest,
+        state=repo,
+    )
+    result = mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
+    assert len(result) == 0
+    key = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
+    assert repo.get_profile_cursor(key) == ts
+
+
+def test_download_retryable_rest_error_raised(repo: SqliteStateRepository, tmp_path: Path):
+    from csob_ceb_bc.errors import CsobBCHttpError
+
+    soap = MagicMock()
+    rest = MagicMock()
+    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
+    soap.get_download_file_list_v4.return_value = MagicMock(
+        query_timestamp=ts,
+        files=[
+            DownloadFile(
+                filename="stmt.pdf",
+                type=DownloadFileType.VYPIS,
+                format="PDF",
+                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
+                size=1024,
+                status=DownloadFileStatus.D,
+                url="https://example.com/stmt.pdf",
+                upload_file_hash=None,
+            )
+        ],
+    )
+    rest.download_to_file.side_effect = CsobBCHttpError(
+        "Server Error", operation="download", permanent=False, retryable=True
+    )
+    mgr = DownloadManager(
+        contract_number="123456",
+        client_app_guid="guid",
+        cert_fingerprint="fp",
+        environment="production",
+        soap=soap,
+        rest=rest,
+        state=repo,
+    )
+    with pytest.raises(CsobBCHttpError):
+        mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)

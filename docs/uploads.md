@@ -37,6 +37,20 @@ This resumes all uploads with `NewFileId` stored but not finished.
 | `AllOrNothing` | Rollback entire batch on any error |
 | `SignedAllOrNothing` | CAdES-BES signed batch; duplicate check cannot be skipped |
 
+## REST Multipart Upload
+
+The SDK uses `multipart/form-data` with the file field named `fileupload` and
+`Content-Type: application/octet-stream` per the ČSOB manual.
+
+> **Note on `Content-Disposition`**
+> The implementation guide contains two different formulations:
+> - Example request: `Content-Disposition: form-data; name="fileupload"; filename="..."`
+> - MIME header table: `Content-Disposition: attachment; filename="..."`
+>
+> The SDK relies on the HTTP client library (httpx) to generate the multipart
+> payload, which produces the standard `form-data` variant. This matches the
+> example request in the manual and conforms to RFC 2046.
+
 ## Metrics
 
 - `upload_start_calls` — counter

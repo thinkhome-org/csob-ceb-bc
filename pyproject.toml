@@ -77,3 +77,8 @@ warn_unused_configs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=src/csob_ceb_bc --cov-report=term-missing"
+
+[dependency-groups]
+dev = [
+    "pypdf>=6.10.2",
+]

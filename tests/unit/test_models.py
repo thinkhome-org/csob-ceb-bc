@@ -100,6 +100,8 @@ def test_upload_file_hash_must_be_64_hex():
     assert UploadFile._hash_must_be_sha256(None) is None
     with pytest.raises(ValueError):
         UploadFile._hash_must_be_sha256("gg")
+    with pytest.raises(ValueError):
+        UploadFile._hash_must_be_sha256("g" * 64)
 
 
 def test_download_file_model():

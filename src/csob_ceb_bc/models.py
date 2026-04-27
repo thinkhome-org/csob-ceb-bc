@@ -41,6 +41,11 @@ class DownloadFilter(BaseModel):
     """Filter for GetDownloadFileList v4."""
 
     file_types: list[DownloadFileType] | None = None
+    file_formats: list[str] | None = None
+    filename: str | None = None
+    created_after: datetime | None = None
+    created_before: datetime | None = None
+    client_app_guid: str | None = None
 
     model_config = {"frozen": True}
 
@@ -56,6 +61,7 @@ class DownloadFile(BaseModel):
     status: DownloadFileStatus
     url: str | None = None
     upload_file_hash: str | None = None
+    ticket_id: str | None = None
 
     model_config = {"frozen": True}
 
@@ -66,7 +72,13 @@ class UploadFile(BaseModel):
     filename: str = Field(..., max_length=50)
     hash: str | None = None
     size: int | None = None
-    format: str
+    format: str = Field(
+        ...,
+        pattern=(
+            r"^(ABO|DUZ|MC TPS|MC ZPS|TXT TPS|TXT ZPS|XLS TPS|XLS ZPS"
+            r"|XLSX TPS|XLSX ZPS|MT101|XML SEPA|XML TPS|XML ZPS)$"
+        ),
+    )
     separator: str | None = None
     mode: UploadMode
     skip_check_duplicates: bool = False
@@ -116,6 +128,7 @@ class UploadStartResult(BaseModel):
 
     filename: str
     status: UploadStartStatus
+    hash: str | None = None
     url: str | None = None
     ticket_id: str | None = None
 

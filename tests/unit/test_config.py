@@ -49,3 +49,11 @@ def test_connector_config_env_override(monkeypatch: pytest.MonkeyPatch):
     )
     assert cfg.contract_number == "999999"
     assert cfg.environment == Environment.DEMO
+
+
+def test_connector_config_empty_guid():
+    with pytest.raises(ValidationError):
+        ConnectorConfig(
+            client_app_guid="",
+            certificate=CertificateConfig(cert_file=Path("c.crt"), key_file=Path("k.key")),
+        )
