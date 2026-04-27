@@ -96,7 +96,7 @@ class CertificateStore:
         except Exception as exc:
             raise CsobBCCertificateError(f"Certificate validation failed: {exc}") from exc
 
-    def build_httpx_client(self, verify: bool | str = True) -> httpx.Client:
+    def _build_ssl_context(self, verify: bool | str = True) -> ssl.SSLContext:
         if verify is False:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             context.check_hostname = False
@@ -108,7 +108,13 @@ class CertificateStore:
             elif self._config.ca_bundle:
                 context.load_verify_locations(str(self._config.ca_bundle))
         context.load_cert_chain(str(self.cert_path), str(self.key_path))
-        return httpx.Client(verify=context)
+        return context
+
+    def build_httpx_client(self, verify: bool | str = True) -> httpx.Client:
+        return httpx.Client(verify=self._build_ssl_context(verify))
+
+    def build_async_httpx_client(self, verify: bool | str = True) -> httpx.AsyncClient:
+        return httpx.AsyncClient(verify=self._build_ssl_context(verify))
 
     def __del__(self) -> None:
         if self._temp_dir is not None:
