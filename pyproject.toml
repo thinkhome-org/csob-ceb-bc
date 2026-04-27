@@ -4,20 +4,24 @@ build-backend = "hatchling.build"
 
 [project]
 name = "csob-ceb-business-connector-sdk"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python SDK for ČSOB CEB Business Connector"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 authors = [
-    {name = "TODO", email = "TODO@example.com"},
+    {name = "SDK Maintainers", email = "sdk@example.com"},
 ]
+keywords = ["csob", "ceb", "business-connector", "banking", "soap", "mtls"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Office/Business :: Financial",
 ]
 dependencies = [
     "zeep>=4.2",
@@ -50,7 +54,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/TODO/csob-ceb-business-connector-sdk"
+Homepage = "https://github.com/example/csob-ceb-business-connector-sdk"
+Repository = "https://github.com/example/csob-ceb-business-connector-sdk"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/csob_ceb_bc"]
