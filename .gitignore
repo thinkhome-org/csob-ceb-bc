@@ -59,7 +59,7 @@ dmypy.json
 *.db-journal
 *.db-wal
 *.db-shm
-state/
+/state/
 *.pfx
 *.p12
 *.key
