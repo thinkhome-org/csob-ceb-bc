@@ -83,13 +83,13 @@ class DownloadManager:
         has_unresolved = False
 
         for file in result.files:
+            if file.status == DownloadFileStatus.F:
+                # permanent failure — log and skip, does NOT block cursor
+                log_ctx.info("download_file_permanent_failure", filename=file.filename)
+                continue
             if file.status == DownloadFileStatus.R or file.url is None:
                 has_unresolved = True
                 log_ctx.info("download_file_unresolved", filename=file.filename, status=file.status.value)
-                continue
-            if file.status == DownloadFileStatus.F:
-                # permanent failure — log and skip
-                log_ctx.info("download_file_permanent_failure", filename=file.filename)
                 continue
             if file.status == DownloadFileStatus.D and file.url:
                 local_path = target_dir / file.filename
