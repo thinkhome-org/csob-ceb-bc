@@ -1,0 +1,7 @@
+environment: demo
+contract_number: "123456"
+client_app_guid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+certificate:
+  cert_file: "./demo.crt"
+  key_file: "./demo.key"
+state_url: "sqlite:///./state.db"
