@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -40,13 +40,13 @@ def test_cursor_not_advanced_when_file_status_r(repo: SqliteStateRepository, tmp
     soap = MagicMock()
     rest = MagicMock()
     soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=datetime(2025, 1, 15, 10, 0, 0, tzinfo=timezone.utc),
+        query_timestamp=datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC),
         files=[
             DownloadFile(
                 filename="stmt.pdf",
                 type=DownloadFileType.VYPIS,
                 format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=timezone.utc),
+                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
                 size=1024,
                 status=DownloadFileStatus.R,
                 url=None,
@@ -71,7 +71,7 @@ def test_cursor_not_advanced_when_file_status_r(repo: SqliteStateRepository, tmp
 def test_cursor_advanced_when_all_downloaded(repo: SqliteStateRepository, tmp_path: Path):
     soap = MagicMock()
     rest = MagicMock()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
     soap.get_download_file_list_v4.return_value = MagicMock(
         query_timestamp=ts,
         files=[
@@ -79,7 +79,7 @@ def test_cursor_advanced_when_all_downloaded(repo: SqliteStateRepository, tmp_pa
                 filename="stmt.pdf",
                 type=DownloadFileType.VYPIS,
                 format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=timezone.utc),
+                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
                 size=1024,
                 status=DownloadFileStatus.D,
                 url="https://example.com/stmt.pdf",
@@ -105,7 +105,7 @@ def test_cursor_advanced_when_all_downloaded(repo: SqliteStateRepository, tmp_pa
 def test_cursor_advanced_when_empty_batch(repo: SqliteStateRepository, tmp_path: Path):
     soap = MagicMock()
     rest = MagicMock()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
     soap.get_download_file_list_v4.return_value = MagicMock(
         query_timestamp=ts,
         files=[],
@@ -128,7 +128,7 @@ def test_cursor_advanced_when_empty_batch(repo: SqliteStateRepository, tmp_path:
 def test_permanent_failure_skipped(repo: SqliteStateRepository, tmp_path: Path):
     soap = MagicMock()
     rest = MagicMock()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
     soap.get_download_file_list_v4.return_value = MagicMock(
         query_timestamp=ts,
         files=[
@@ -136,7 +136,7 @@ def test_permanent_failure_skipped(repo: SqliteStateRepository, tmp_path: Path):
                 filename="bad.pdf",
                 type=DownloadFileType.VYPIS,
                 format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=timezone.utc),
+                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
                 size=1024,
                 status=DownloadFileStatus.F,
                 url=None,
@@ -164,7 +164,7 @@ def test_download_metrics_populated(repo: SqliteStateRepository, tmp_path: Path)
     soap = MagicMock()
     rest = MagicMock()
     metrics = MetricsCollector()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
     soap.get_download_file_list_v4.return_value = MagicMock(
         query_timestamp=ts,
         files=[
@@ -172,7 +172,7 @@ def test_download_metrics_populated(repo: SqliteStateRepository, tmp_path: Path)
                 filename="stmt.pdf",
                 type=DownloadFileType.VYPIS,
                 format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=timezone.utc),
+                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
                 size=1024,
                 status=DownloadFileStatus.D,
                 url="https://example.com/stmt.pdf",
@@ -200,7 +200,7 @@ def test_download_unresolved_metrics(repo: SqliteStateRepository, tmp_path: Path
     soap = MagicMock()
     rest = MagicMock()
     metrics = MetricsCollector()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
     soap.get_download_file_list_v4.return_value = MagicMock(
         query_timestamp=ts,
         files=[
@@ -208,7 +208,7 @@ def test_download_unresolved_metrics(repo: SqliteStateRepository, tmp_path: Path
                 filename="stmt.pdf",
                 type=DownloadFileType.VYPIS,
                 format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=timezone.utc),
+                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
                 size=1024,
                 status=DownloadFileStatus.R,
                 url=None,

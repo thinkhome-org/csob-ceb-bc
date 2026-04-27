@@ -1,14 +1,13 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
 import respx
 
-from csob_ceb_bc.rest.transfer import RestTransferClient
 from csob_ceb_bc.certificates.store import CertificateStore
 from csob_ceb_bc.config import CertificateConfig
 from csob_ceb_bc.errors import CsobBCHttpError
+from csob_ceb_bc.rest.transfer import RestTransferClient
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 

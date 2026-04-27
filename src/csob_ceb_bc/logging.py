@@ -1,7 +1,9 @@
+from typing import Any
+
 import structlog
 
 
-def get_logger(name: str = "csob_ceb_bc"):
+def get_logger(name: str = "csob_ceb_bc") -> Any:
     structlog.configure(
         processors=[
             structlog.stdlib.filter_by_level,

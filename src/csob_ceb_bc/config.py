@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Environment(str, Enum):
+class Environment(StrEnum):
     PRODUCTION = "production"
     DEMO = "demo"
 
@@ -38,7 +38,7 @@ class CertificateConfig(BaseModel):
     pfx_password_env: str | None = None
 
     @model_validator(mode="after")
-    def _cert_or_pfx(self) -> "CertificateConfig":
+    def _cert_or_pfx(self) -> CertificateConfig:
         has_pem = self.cert_file is not None and self.key_file is not None
         has_pfx = self.pfx_file is not None
         if not has_pem and not has_pfx:

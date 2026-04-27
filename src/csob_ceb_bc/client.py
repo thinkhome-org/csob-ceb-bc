@@ -2,23 +2,24 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from typing import Any
 
 from csob_ceb_bc.certificates.store import CertificateStore
 from csob_ceb_bc.config import ConnectorConfig
 from csob_ceb_bc.downloads.manager import DownloadManager
 from csob_ceb_bc.import_protocols.manager import ImportProtocolManager
+from csob_ceb_bc.metrics import MetricsCollector
 from csob_ceb_bc.models import (
     DownloadFile,
     DownloadFilter,
     UploadFile,
     UploadFinishResult,
 )
+from csob_ceb_bc.rate_limit import TokenBucketRateLimiter
 from csob_ceb_bc.rest.transfer import RestTransferClient
 from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.sqlite_repo import SqliteStateRepository
 from csob_ceb_bc.uploads.manager import UploadManager
-from csob_ceb_bc.rate_limit import TokenBucketRateLimiter
-from csob_ceb_bc.metrics import MetricsCollector
 
 
 class BusinessConnectorClient:
@@ -71,7 +72,7 @@ class BusinessConnectorClient:
         )
 
     @classmethod
-    def from_config(cls, config: ConnectorConfig) -> "BusinessConnectorClient":
+    def from_config(cls, config: ConnectorConfig) -> BusinessConnectorClient:
         cert_store = CertificateStore(config.certificate)
         cert_store.validate_not_expiring()
         state = SqliteStateRepository(config.state_url)
@@ -118,6 +119,6 @@ class BusinessConnectorClient:
         """Resume any pending uploads or downloads after a crash."""
         self._upload_manager.resume_pending()
 
-    def metrics_snapshot(self) -> dict:
+    def metrics_snapshot(self) -> dict[str, Any]:
         """Return current metrics snapshot."""
         return self._metrics.snapshot()

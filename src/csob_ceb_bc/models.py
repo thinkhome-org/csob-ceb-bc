@@ -1,40 +1,40 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class DownloadFileType(str, Enum):
+class DownloadFileType(StrEnum):
     VYPIS = "VYPIS"
     AVIZO = "AVIZO"
     KURZY = "KURZY"
     IMPPROT = "IMPPROT"
 
 
-class DownloadFileStatus(str, Enum):
+class DownloadFileStatus(StrEnum):
     R = "R"
     D = "D"
     F = "F"
 
 
-class UploadMode(str, Enum):
+class UploadMode(StrEnum):
     IncludeIncorrect = "IncludeIncorrect"
     OnlyCorrect = "OnlyCorrect"
     AllOrNothing = "AllOrNothing"
     SignedAllOrNothing = "SignedAllOrNothing"
 
 
-class UploadStartStatus(str, Enum):
+class UploadStartStatus(StrEnum):
     R = "R"
     U = "U"
 
 
-class UploadFinishStatus(str, Enum):
+class UploadFinishStatus(StrEnum):
     R = "R"
-    I = "I"
+    I = "I"  # noqa: E741
 
 
 class DownloadFilter(BaseModel):
@@ -97,8 +97,8 @@ class UploadFile(BaseModel):
             raise ValueError("hash must be 64 hex characters (SHA256)")
         try:
             int(v, 16)
-        except ValueError:
-            raise ValueError("hash must be valid hex")
+        except ValueError as exc:
+            raise ValueError("hash must be valid hex") from exc
         return v
 
     @field_validator("skip_check_duplicates", mode="before")

@@ -32,8 +32,7 @@ class RestTransferClient:
     def download_to_file(self, url: str, target: Path) -> HttpTransferResult:
         part = target.with_suffix(target.suffix + ".part")
         start = time.monotonic()
-        with self._client() as client:
-            with client.stream("GET", url, timeout=self._timeout) as response:
+        with self._client() as client, client.stream("GET", url, timeout=self._timeout) as response:
                 if response.status_code == 200:
                     with open(part, "wb") as f:
                         for chunk in response.iter_bytes():
@@ -53,13 +52,11 @@ class RestTransferClient:
 
     @retry_rest(max_attempts=3)
     def upload_multipart(self, url: str, file: Path, filename: str) -> RestUploadResult:
-        start = time.monotonic()
-        with self._client() as client:
-            with open(file, "rb") as f:
-                files = {
-                    "fileupload": (filename, f, "application/octet-stream"),
-                }
-                response = client.post(url, files=files, timeout=self._timeout)
+        with self._client() as client, open(file, "rb") as f:
+            files = {
+                "fileupload": (filename, f, "application/octet-stream"),
+            }
+            response = client.post(url, files=files, timeout=self._timeout)
 
         if response.status_code not in (200, 201):
             self._raise_for_status(response.status_code, "upload")

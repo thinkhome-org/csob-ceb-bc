@@ -1,15 +1,17 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
+
 from csob_ceb_bc.models import (
-    DownloadFileType,
+    DownloadFile,
     DownloadFileStatus,
+    DownloadFileType,
+    DownloadFilter,
+    SoapFaultInfo,
+    UploadFile,
+    UploadFinishStatus,
     UploadMode,
     UploadStartStatus,
-    UploadFinishStatus,
-    DownloadFilter,
-    UploadFile,
-    DownloadFile,
-    SoapFaultInfo,
 )
 
 
@@ -62,7 +64,12 @@ def test_upload_file_separator_validation():
     UploadFile(filename="test.xml", format="XML SEPA", mode=UploadMode.AllOrNothing, separator="|")
     UploadFile(filename="test.xml", format="XML SEPA", mode=UploadMode.AllOrNothing, separator=";;")
     with pytest.raises(ValueError):
-        UploadFile(filename="test.xml", format="XML SEPA", mode=UploadMode.AllOrNothing, separator=",")
+        UploadFile(
+            filename="test.xml",
+            format="XML SEPA",
+            mode=UploadMode.AllOrNothing,
+            separator=",",
+        )
 
 
 def test_upload_file_signed_mode_no_skip_duplicates_promise():
@@ -93,7 +100,7 @@ def test_download_file_model():
         filename="stmt.pdf",
         type=DownloadFileType.VYPIS,
         format="PDF",
-        creation_date_time=datetime.now(timezone.utc),
+        creation_date_time=datetime.now(UTC),
         size=1024,
         status=DownloadFileStatus.D,
         url="https://example.com/file",

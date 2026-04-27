@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import zeep
 from zeep.exceptions import Fault
 
 from csob_ceb_bc.config import ConnectorConfig, Environment
-from csob_ceb_bc.errors import CsobBCSoapFault, CsobBCRateLimitError
+from csob_ceb_bc.errors import CsobBCRateLimitError
 from csob_ceb_bc.models import (
     DownloadFile,
     DownloadFileStatus,
@@ -20,9 +19,9 @@ from csob_ceb_bc.models import (
     UploadStartResult,
     UploadStartStatus,
 )
-from csob_ceb_bc.soap.faults import map_soap_fault
-from csob_ceb_bc.retry import retry_soap
 from csob_ceb_bc.rate_limit import TokenBucketRateLimiter
+from csob_ceb_bc.retry import retry_soap
+from csob_ceb_bc.soap.faults import map_soap_fault
 
 
 class DownloadListResult:
@@ -46,13 +45,12 @@ class SoapGateway:
         self._config = config
         self._endpoint = self.DEMO_URL if config.environment == Environment.DEMO else self.PROD_URL
         self._wsdl_path = wsdl_path or self._endpoint + "?wsdl"
-        self._client = zeep.Client(self._wsdl_path)
+        self._client = zeep.Client(self._wsdl_path)  # type: ignore[no-untyped-call]
         self._rate_limiter = rate_limiter
         self._setup_transport()
 
     def _check_rate_limit(self) -> None:
-        if self._rate_limiter is not None:
-            if not self._rate_limiter.acquire():
+        if self._rate_limiter is not None and not self._rate_limiter.acquire():
                 raise CsobBCRateLimitError(
                     "SOAP rate limit exceeded",
                     operation="soap",
@@ -110,7 +108,11 @@ class SoapGateway:
             fault_string = str(fault)
             if isinstance(fault.detail, dict):
                 fault_code = fault.detail.get("FaultCode") or fault.detail.get("faultcode")
-                fault_string = fault.detail.get("FaultString") or fault.detail.get("faultstring") or fault_string
+                fault_string = (
+                    fault.detail.get("FaultString")
+                    or fault.detail.get("faultstring")
+                    or fault_string
+                )
             raise map_soap_fault(
                 fault_code=fault_code,
                 fault_string=fault_string,
@@ -119,7 +121,7 @@ class SoapGateway:
 
         qt = self._parse_datetime(response.get("QueryTimestamp"))
         if qt is None:
-            qt = datetime.now(timezone.utc)
+            qt = datetime.now(UTC)
 
         files: list[DownloadFile] = []
         file_list = response.get("FileList")
@@ -171,7 +173,11 @@ class SoapGateway:
             fault_string = str(fault)
             if isinstance(fault.detail, dict):
                 fault_code = fault.detail.get("FaultCode") or fault.detail.get("faultcode")
-                fault_string = fault.detail.get("FaultString") or fault.detail.get("faultstring") or fault_string
+                fault_string = (
+                    fault.detail.get("FaultString")
+                    or fault.detail.get("faultstring")
+                    or fault_string
+                )
             raise map_soap_fault(
                 fault_code=fault_code,
                 fault_string=fault_string,
@@ -217,7 +223,11 @@ class SoapGateway:
             fault_string = str(fault)
             if isinstance(fault.detail, dict):
                 fault_code = fault.detail.get("FaultCode") or fault.detail.get("faultcode")
-                fault_string = fault.detail.get("FaultString") or fault.detail.get("faultstring") or fault_string
+                fault_string = (
+                    fault.detail.get("FaultString")
+                    or fault.detail.get("faultstring")
+                    or fault_string
+                )
             raise map_soap_fault(
                 fault_code=fault_code,
                 fault_string=fault_string,

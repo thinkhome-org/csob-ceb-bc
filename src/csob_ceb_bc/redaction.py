@@ -13,7 +13,7 @@ def redact_url(url: str) -> str:
     for param in sensitive_params:
         url = re.sub(
             rf"({param}=)[^&]*",
-            rf"\1***",
+            r"\1***",
             url,
             flags=re.IGNORECASE,
         )

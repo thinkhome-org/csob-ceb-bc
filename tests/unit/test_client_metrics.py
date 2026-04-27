@@ -4,9 +4,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from csob_ceb_bc.client import BusinessConnectorClient
-from csob_ceb_bc.config import ConnectorConfig, CertificateConfig, Environment
+from csob_ceb_bc.config import CertificateConfig, ConnectorConfig, Environment
 from csob_ceb_bc.metrics import MetricsCollector
-from csob_ceb_bc.models import DownloadFilter
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 

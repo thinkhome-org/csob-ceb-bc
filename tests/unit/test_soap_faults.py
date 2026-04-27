@@ -1,11 +1,10 @@
-import pytest
-from csob_ceb_bc.soap.faults import map_soap_fault
 from csob_ceb_bc.errors import (
-    CsobBCSoapFault,
-    CsobBCRateLimitError,
     CsobBCPermanentError,
+    CsobBCRateLimitError,
     CsobBCRetryableError,
+    CsobBCSoapFault,
 )
+from csob_ceb_bc.soap.faults import map_soap_fault
 
 
 def test_map_1000_retryable():

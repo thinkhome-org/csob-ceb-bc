@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -19,13 +19,13 @@ def test_poll_import_protocols_pairs_by_hash(repo: SqliteStateRepository, tmp_pa
     rest = MagicMock()
     sha = "a" * 64
     soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=datetime.now(timezone.utc),
+        query_timestamp=datetime.now(UTC),
         files=[
             DownloadFile(
                 filename="prot.xml",
                 type=DownloadFileType.IMPPROT,
                 format="XML",
-                creation_date_time=datetime.now(timezone.utc),
+                creation_date_time=datetime.now(UTC),
                 size=512,
                 status=DownloadFileStatus.D,
                 url="https://example.com/prot",

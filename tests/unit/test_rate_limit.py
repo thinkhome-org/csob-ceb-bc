@@ -1,7 +1,5 @@
 import time
 
-import pytest
-
 from csob_ceb_bc.rate_limit import TokenBucketRateLimiter
 
 

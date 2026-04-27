@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from csob_ceb_bc.client import BusinessConnectorClient
-from csob_ceb_bc.config import ConnectorConfig, CertificateConfig, Environment
+from csob_ceb_bc.config import CertificateConfig, ConnectorConfig, Environment
 from csob_ceb_bc.models import DownloadFilter, UploadFile, UploadMode
 
 
@@ -49,7 +49,7 @@ def test_full_download_upload_flow(mock_soap, mock_rest, mock_state, mock_cert, 
     assert files == []
 
     # Act & Assert: upload
-    from csob_ceb_bc.models import UploadStartStatus, UploadFinishStatus, RestUploadResult
+    from csob_ceb_bc.models import RestUploadResult, UploadFinishStatus, UploadStartStatus
     soap.start_upload_file_list_v3.return_value = [
         MagicMock(filename="pay.xml", status=UploadStartStatus.U, url="https://up", ticket_id="T1")
     ]

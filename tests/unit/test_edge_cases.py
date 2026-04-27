@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -12,7 +13,6 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
-from datetime import datetime, timedelta, timezone
 
 from csob_ceb_bc.certificates.store import CertificateStore
 from csob_ceb_bc.config import CertificateConfig
@@ -62,7 +62,9 @@ def test_upload_multipart_malformed_schema():
 
 @respx.mock
 def test_download_connection_timeout(tmp_path: Path):
-    route = respx.get("https://example.com/file").mock(side_effect=httpx.ConnectTimeout("Connection timed out"))
+    route = respx.get("https://example.com/file").mock(
+        side_effect=httpx.ConnectTimeout("Connection timed out")
+    )
     client = RestTransferClient(cert_store=_store())
     with pytest.raises(httpx.ConnectTimeout):
         client.download_to_file("https://example.com/file", tmp_path / "out.bin")
@@ -71,7 +73,9 @@ def test_download_connection_timeout(tmp_path: Path):
 
 @respx.mock
 def test_download_read_timeout(tmp_path: Path):
-    route = respx.get("https://example.com/file").mock(side_effect=httpx.ReadTimeout("Read timed out"))
+    route = respx.get("https://example.com/file").mock(
+        side_effect=httpx.ReadTimeout("Read timed out")
+    )
     client = RestTransferClient(cert_store=_store())
     with pytest.raises(httpx.ReadTimeout):
         client.download_to_file("https://example.com/file", tmp_path / "out.bin")
@@ -80,7 +84,9 @@ def test_download_read_timeout(tmp_path: Path):
 
 @respx.mock
 def test_upload_connection_error():
-    route = respx.post("https://example.com/upload").mock(side_effect=httpx.ConnectError("No route to host"))
+    route = respx.post("https://example.com/upload").mock(
+        side_effect=httpx.ConnectError("No route to host")
+    )
     client = RestTransferClient(cert_store=_store())
     file_path = FIXTURES / "certs" / "test.pem"
     with pytest.raises(httpx.ConnectError):
@@ -122,8 +128,8 @@ def test_certificate_expires_soon(tmp_path: Path):
         .issuer_name(issuer)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.now(timezone.utc) - timedelta(days=1))
-        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=3))
+        .not_valid_before(datetime.now(UTC) - timedelta(days=1))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=3))
         .add_extension(x509.SubjectAlternativeName([x509.DNSName("localhost")]), critical=False)
         .sign(key, hashes.SHA256())
     )

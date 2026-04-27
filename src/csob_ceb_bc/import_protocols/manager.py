@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from csob_ceb_bc.models import DownloadFile, DownloadFileStatus, DownloadFilter, DownloadFileType
+from csob_ceb_bc.metrics import MetricsCollector, timed
+from csob_ceb_bc.models import DownloadFile, DownloadFileStatus, DownloadFileType, DownloadFilter
 from csob_ceb_bc.rest.transfer import RestTransferClient
 from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.base import StateRepository
-from csob_ceb_bc.metrics import MetricsCollector, timed
 
 
 class ImportProtocolManager:

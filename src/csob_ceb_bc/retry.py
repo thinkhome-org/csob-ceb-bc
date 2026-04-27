@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from typing import Callable, TypeVar
+import logging
+from collections.abc import Callable
+from typing import TypeVar
 
 from tenacity import (
+    before_sleep_log,
     retry,
     retry_if_exception,
     stop_after_attempt,
     wait_exponential_jitter,
-    before_sleep_log,
 )
-import logging
 
 from csob_ceb_bc.errors import (
     CsobBCError,
@@ -34,9 +35,7 @@ def _is_retryable(exc: BaseException) -> bool:
         return True
     if isinstance(exc, CsobBCHttpError) and exc.retryable:
         return True
-    if isinstance(exc, CsobBCError) and exc.retryable:
-        return True
-    return False
+    return isinstance(exc, CsobBCError) and exc.retryable
 
 
 def retry_soap(

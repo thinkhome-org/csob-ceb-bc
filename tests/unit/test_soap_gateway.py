@@ -1,13 +1,13 @@
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from csob_ceb_bc.soap.gateway import SoapGateway
-from csob_ceb_bc.config import ConnectorConfig, CertificateConfig, Environment
-from csob_ceb_bc.models import DownloadFilter, UploadFile, UploadMode
+from csob_ceb_bc.config import CertificateConfig, ConnectorConfig, Environment
 from csob_ceb_bc.errors import CsobBCRateLimitError
+from csob_ceb_bc.models import DownloadFilter
+from csob_ceb_bc.soap.gateway import SoapGateway
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
@@ -17,7 +17,10 @@ def _config() -> ConnectorConfig:
         environment=Environment.DEMO,
         contract_number="123456",
         client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        certificate=CertificateConfig(cert_file=FIXTURES / "certs" / "test.pem", key_file=FIXTURES / "certs" / "test.key"),
+        certificate=CertificateConfig(
+            cert_file=FIXTURES / "certs" / "test.pem",
+            key_file=FIXTURES / "certs" / "test.key",
+        ),
     )
 
 
@@ -45,7 +48,7 @@ def test_get_download_file_list_v4(mock_client_cls: MagicMock):
 
     gw = SoapGateway(_config(), wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"))
     result = gw.get_download_file_list_v4(
-        prev_query_timestamp=datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+        prev_query_timestamp=datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC),
         filter=DownloadFilter(file_types=["VYPIS"]),
     )
     assert result.query_timestamp is not None

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 
 class CsobBCError(Exception):
     """Base exception for all SDK errors."""
@@ -71,7 +73,7 @@ class CsobBCHttpError(CsobBCError):
 class CsobBCRetryableError(CsobBCError):
     """Base for errors that may be retried."""
 
-    def __init__(self, message: str, **kwargs: object) -> None:
+    def __init__(self, message: str, **kwargs: Any) -> None:
         kwargs.setdefault("retryable", True)
         kwargs.setdefault("permanent", False)
         super().__init__(message, **kwargs)
@@ -80,7 +82,7 @@ class CsobBCRetryableError(CsobBCError):
 class CsobBCPermanentError(CsobBCError):
     """Base for errors that must not be retried automatically."""
 
-    def __init__(self, message: str, **kwargs: object) -> None:
+    def __init__(self, message: str, **kwargs: Any) -> None:
         kwargs.setdefault("retryable", False)
         kwargs.setdefault("permanent", True)
         super().__init__(message, **kwargs)

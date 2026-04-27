@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-import hashlib
-from datetime import datetime, timezone
 from pathlib import Path
 
+from csob_ceb_bc.logging import get_logger
+from csob_ceb_bc.metrics import MetricsCollector, timed
 from csob_ceb_bc.models import DownloadFile, DownloadFileStatus, DownloadFilter
+from csob_ceb_bc.redaction import redact_contract
 from csob_ceb_bc.rest.transfer import RestTransferClient
 from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.base import StateRepository
-from csob_ceb_bc.logging import get_logger
-from csob_ceb_bc.redaction import redact_contract
-from csob_ceb_bc.metrics import MetricsCollector, timed
 
 logger = get_logger("csob_ceb_bc.downloads")
 
@@ -89,7 +87,11 @@ class DownloadManager:
                 continue
             if file.status == DownloadFileStatus.R or file.url is None:
                 has_unresolved = True
-                log_ctx.info("download_file_unresolved", filename=file.filename, status=file.status.value)
+                log_ctx.info(
+                    "download_file_unresolved",
+                    filename=file.filename,
+                    status=file.status.value,
+                )
                 continue
             if file.status == DownloadFileStatus.D and file.url:
                 local_path = target_dir / file.filename
@@ -101,7 +103,11 @@ class DownloadManager:
                 downloaded.append(file)
                 if self._metrics:
                     self._metrics.inc("download_success")
-                log_ctx.info("download_file_success", filename=file.filename, local_path=str(local_path))
+                log_ctx.info(
+                    "download_file_success",
+                    filename=file.filename,
+                    local_path=str(local_path),
+                )
 
         if not has_unresolved:
             self._state.set_profile_cursor(key, result.query_timestamp)
@@ -112,6 +118,10 @@ class DownloadManager:
             )
 
         if has_unresolved and self._metrics:
-            self._metrics.inc("download_unresolved_files", len([f for f in result.files if f.status == DownloadFileStatus.R or f.url is None]))
+            unresolved = [
+                f for f in result.files
+                if f.status == DownloadFileStatus.R or f.url is None
+            ]
+            self._metrics.inc("download_unresolved_files", len(unresolved))
 
         return downloaded

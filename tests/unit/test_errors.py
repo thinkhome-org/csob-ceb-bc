@@ -1,19 +1,11 @@
-import pytest
 from csob_ceb_bc.errors import (
+    CsobBCDuplicateUploadError,
     CsobBCError,
-    CsobBCConfigError,
-    CsobBCCertificateError,
-    CsobBCSoapError,
-    CsobBCSoapFault,
-    CsobBCHttpError,
-    CsobBCRetryableError,
     CsobBCPermanentError,
     CsobBCRateLimitError,
-    CsobBCDownloadError,
-    CsobBCUploadError,
-    CsobBCDuplicateUploadError,
-    CsobBCStateError,
-    CsobBCProtocolError,
+    CsobBCRetryableError,
+    CsobBCSoapError,
+    CsobBCSoapFault,
 )
 
 

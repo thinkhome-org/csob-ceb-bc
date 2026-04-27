@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -80,7 +80,8 @@ class SqliteStateRepository(StateRepository):
         # enrich with rest result if present
         with self._connect() as conn:
             rest = conn.execute(
-                "SELECT new_file_id FROM upload_rest_results WHERE attempt_id = ? ORDER BY id DESC LIMIT 1",
+                "SELECT new_file_id FROM upload_rest_results "
+                "WHERE attempt_id = ? ORDER BY id DESC LIMIT 1",
                 (attempt_id,),
             ).fetchone()
         if rest:
@@ -150,10 +151,11 @@ class SqliteStateRepository(StateRepository):
         """Return uploads in 'rest_done' state without finish result."""
         with self._connect() as conn:
             rows = conn.execute(
-                """SELECT a.attempt_id, a.filename, a.file_hash, a.file_format, a.mode, r.new_file_id
-                   FROM upload_attempts a
-                   JOIN upload_rest_results r ON a.attempt_id = r.attempt_id
-                   LEFT JOIN upload_finish_results f ON a.attempt_id = f.attempt_id
-                   WHERE a.status = 'rest_done' AND f.id IS NULL"""
+                """SELECT a.attempt_id, a.filename, a.file_hash,
+                           a.file_format, a.mode, r.new_file_id
+                    FROM upload_attempts a
+                    JOIN upload_rest_results r ON a.attempt_id = r.attempt_id
+                    LEFT JOIN upload_finish_results f ON a.attempt_id = f.attempt_id
+                    WHERE a.status = 'rest_done' AND f.id IS NULL"""
             ).fetchall()
         return [dict(row) for row in rows]

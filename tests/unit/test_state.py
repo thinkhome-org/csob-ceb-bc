@@ -1,5 +1,4 @@
-import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -16,7 +15,7 @@ def repo(tmp_path: Path):
 def test_get_set_profile_cursor(repo: SqliteStateRepository):
     key = "prod:123456:VYPIS"
     assert repo.get_profile_cursor(key) is None
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
     repo.set_profile_cursor(key, ts)
     assert repo.get_profile_cursor(key) == ts
 
@@ -53,7 +52,12 @@ def test_save_new_file_id(repo: SqliteStateRepository):
 def test_idempotency_check(repo: SqliteStateRepository):
     h = "abc123" * 10 + "ab"
     repo.create_upload_attempt(
-        attempt_id="a3", filename="pay.xml", file_hash=h, size=1, file_format="XML SEPA", mode="AllOrNothing"
+        attempt_id="a3",
+        filename="pay.xml",
+        file_hash=h,
+        size=1,
+        file_format="XML SEPA",
+        mode="AllOrNothing",
     )
     repo.mark_idempotency_key(h, "a3")
     assert repo.get_attempt_id_by_hash(h) == "a3"

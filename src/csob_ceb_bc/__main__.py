@@ -5,7 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from csob_ceb_bc import BusinessConnectorClient, ConnectorConfig, CertificateConfig, Environment
+from csob_ceb_bc import BusinessConnectorClient, CertificateConfig, ConnectorConfig, Environment
 from csob_ceb_bc.models import DownloadFilter
 
 
@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return 1
-    return args.func(args)
+    return args.func(args)  # type: ignore[no-any-return]
 
 
 if __name__ == "__main__":

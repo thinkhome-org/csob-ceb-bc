@@ -1,11 +1,9 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from csob_ceb_bc.client import BusinessConnectorClient
-from csob_ceb_bc.config import ConnectorConfig, CertificateConfig, Environment
-from csob_ceb_bc.models import DownloadFilter, UploadFile, UploadMode
+from csob_ceb_bc.config import CertificateConfig, ConnectorConfig, Environment
+from csob_ceb_bc.models import DownloadFilter
 
 
 def _config() -> ConnectorConfig:

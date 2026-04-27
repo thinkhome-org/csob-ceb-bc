@@ -1,10 +1,9 @@
-import os
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from csob_ceb_bc.config import Environment, CertificateConfig, ConnectorConfig
+from csob_ceb_bc.config import CertificateConfig, ConnectorConfig, Environment
 
 
 def test_environment_enum():

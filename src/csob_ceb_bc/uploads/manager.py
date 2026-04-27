@@ -4,6 +4,8 @@ import hashlib
 import uuid
 from pathlib import Path
 
+from csob_ceb_bc.logging import get_logger
+from csob_ceb_bc.metrics import MetricsCollector, timed
 from csob_ceb_bc.models import (
     UploadFile,
     UploadFinishResult,
@@ -11,12 +13,10 @@ from csob_ceb_bc.models import (
     UploadStartResult,
     UploadStartStatus,
 )
+from csob_ceb_bc.redaction import redact_contract
 from csob_ceb_bc.rest.transfer import RestTransferClient
 from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.base import StateRepository
-from csob_ceb_bc.logging import get_logger
-from csob_ceb_bc.redaction import redact_contract
-from csob_ceb_bc.metrics import MetricsCollector, timed
 
 logger = get_logger("csob_ceb_bc.uploads")
 
@@ -132,7 +132,11 @@ class UploadManager:
                     ticket_id=finish.ticket_id,
                 )
                 self._state.mark_idempotency_key(sha, attempt_id)
-                log_ctx.info("upload_finish", status=finish.status.value, ticket_id=finish.ticket_id)
+                log_ctx.info(
+                    "upload_finish",
+                    status=finish.status.value,
+                    ticket_id=finish.ticket_id,
+                )
                 if self._metrics:
                     self._metrics.inc("upload_finish_calls")
                     if finish.status == UploadFinishStatus.I:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ssl
 import tempfile
+from datetime import UTC
 from pathlib import Path
 
 import httpx
@@ -79,11 +80,11 @@ class CertificateStore:
         try:
             pem = self.cert_path.read_bytes()
             cert = x509.load_pem_x509_certificate(pem, default_backend())
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             if cert.not_valid_after_utc is None:
                 raise CsobBCCertificateError("Certificate has no expiry date")
-            days_left = (cert.not_valid_after_utc - datetime.now(timezone.utc)).days
+            days_left = (cert.not_valid_after_utc - datetime.now(UTC)).days
             if days_left < min_days:
                 raise CsobBCCertificateError(
                     f"Certificate expires in {days_left} days (minimum {min_days})",

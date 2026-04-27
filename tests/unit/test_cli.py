@@ -1,6 +1,4 @@
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from csob_ceb_bc.__main__ import main
 

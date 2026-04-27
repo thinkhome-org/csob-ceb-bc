@@ -3,9 +3,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from csob_ceb_bc.uploads.manager import UploadManager
 from csob_ceb_bc.models import UploadFinishStatus
 from csob_ceb_bc.state.sqlite_repo import SqliteStateRepository
+from csob_ceb_bc.uploads.manager import UploadManager
 
 
 @pytest.fixture

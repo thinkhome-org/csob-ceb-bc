@@ -1,12 +1,11 @@
 from pathlib import Path
 
-import pytest
 import httpx
+import pytest
 
 from csob_ceb_bc.certificates.store import CertificateStore
 from csob_ceb_bc.config import CertificateConfig
 from csob_ceb_bc.errors import CsobBCCertificateError
-
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "certs"
 
