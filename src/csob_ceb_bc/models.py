@@ -125,7 +125,7 @@ class UploadStartResult(BaseModel):
 class RestUploadResult(BaseModel):
     """Parsed JSON response from REST upload POST."""
 
-    status: str
+    status: str = Field(..., alias="Status")
     ext_file_url: str = Field(..., alias="ExtFileUrl")
     new_file_id: str = Field(..., alias="NewFileId")
 
