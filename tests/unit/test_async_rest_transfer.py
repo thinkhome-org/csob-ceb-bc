@@ -78,3 +78,68 @@ async def test_async_upload_malformed_json():
             "https://example.com/upload", file_path, "test.pem"
         )
     assert "non-JSON" in str(exc_info.value)
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_async_upload_malformed_schema():
+    respx.post("https://example.com/upload").mock(
+        return_value=httpx.Response(200, json={"unexpected": "field"})
+    )
+    client = AsyncRestTransferClient(cert_store=_store())
+    file_path = FIXTURES / "certs" / "test.pem"
+    with pytest.raises(CsobBCProtocolError) as exc_info:
+        await client.upload_multipart(
+            "https://example.com/upload", file_path, "test.pem"
+        )
+    assert "schema" in str(exc_info.value).lower() or "JSON" in str(exc_info.value)
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_async_download_connection_timeout(tmp_path: Path):
+    route = respx.get("https://example.com/file").mock(
+        side_effect=httpx.ConnectTimeout("Connection timed out")
+    )
+    client = AsyncRestTransferClient(cert_store=_store())
+    with pytest.raises(httpx.ConnectTimeout):
+        await client.download_to_file("https://example.com/file", tmp_path / "out.bin")
+    assert route.called
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_async_download_read_timeout(tmp_path: Path):
+    route = respx.get("https://example.com/file").mock(
+        side_effect=httpx.ReadTimeout("Read timed out")
+    )
+    client = AsyncRestTransferClient(cert_store=_store())
+    with pytest.raises(httpx.ReadTimeout):
+        await client.download_to_file("https://example.com/file", tmp_path / "out.bin")
+    assert route.called
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_async_upload_connection_error():
+    route = respx.post("https://example.com/upload").mock(
+        side_effect=httpx.ConnectError("No route to host")
+    )
+    client = AsyncRestTransferClient(cert_store=_store())
+    file_path = FIXTURES / "certs" / "test.pem"
+    with pytest.raises(httpx.ConnectError):
+        await client.upload_multipart(
+            "https://example.com/upload", file_path, "test.pem"
+        )
+    assert route.called
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_async_download_503_retryable():
+    respx.get("https://example.com/file").mock(return_value=httpx.Response(503))
+    client = AsyncRestTransferClient(cert_store=_store())
+    with pytest.raises(CsobBCHttpError) as exc_info:
+        await client.download_to_file("https://example.com/file", Path("/dev/null"))
+    assert exc_info.value.retryable is True
+    assert exc_info.value.permanent is False

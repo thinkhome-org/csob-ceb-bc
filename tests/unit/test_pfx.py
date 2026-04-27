@@ -45,3 +45,15 @@ def test_pfx_invalid_password():
         )
     )
     assert store.cert_path.exists()
+
+
+def test_pfx_invalid_data(tmp_path: Path):
+    bad_pfx = tmp_path / "bad.pfx"
+    bad_pfx.write_bytes(b"not a valid pfx")
+    with pytest.raises(CsobBCCertificateError) as exc_info:
+        CertificateStore(
+            CertificateConfig(
+                pfx_file=bad_pfx,
+            )
+        )
+    assert "Failed to load PFX" in str(exc_info.value)
