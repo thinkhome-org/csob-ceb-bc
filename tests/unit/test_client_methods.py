@@ -1,11 +1,13 @@
 """Tests for BusinessConnectorClient high-level methods."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from csob_ceb_bc.client import BusinessConnectorClient
 from csob_ceb_bc.config import CertificateConfig, ConnectorConfig, Environment
-from csob_ceb_bc.models import DownloadFilter, UploadFile, UploadMode
+from csob_ceb_bc.models import DownloadBatchResult, DownloadFilter, UploadFile, UploadMode
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
@@ -14,7 +16,7 @@ def _config() -> ConnectorConfig:
     return ConnectorConfig(
         environment=Environment.DEMO,
         contract_number="123456",
-        client_app_guid="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         certificate=CertificateConfig(
             cert_file=FIXTURES / "certs" / "test.pem",
             key_file=FIXTURES / "certs" / "test.key",
@@ -23,16 +25,17 @@ def _config() -> ConnectorConfig:
     )
 
 
-@patch("csob_ceb_bc.client.SoapGateway")
-@patch("csob_ceb_bc.client.RestTransferClient")
+@pytest.mark.asyncio
+@patch("csob_ceb_bc.client.AsyncSoapGateway")
+@patch("csob_ceb_bc.client.AsyncRestTransferClient")
 @patch("csob_ceb_bc.client.SqliteStateRepository")
-def test_download_new_files_delegates(mock_state, mock_rest, mock_soap):
+async def test_download_new_files_delegates(mock_state, mock_rest, mock_soap):
     config = _config()
     cert_store = MagicMock()
     cert_store.cert_path.read_bytes.return_value = b"cert"
 
     dm = MagicMock()
-    dm.download_new_files.return_value = []
+    dm.download_new_files = AsyncMock(return_value=DownloadBatchResult())
 
     client = BusinessConnectorClient(
         config=config,
@@ -43,21 +46,22 @@ def test_download_new_files_delegates(mock_state, mock_rest, mock_soap):
     )
     client._download_manager = dm
 
-    result = client.download_new_files(DownloadFilter(file_types=["VYPIS"]), Path("/tmp"))
-    dm.download_new_files.assert_called_once()
-    assert result == []
+    result = await client.download_new_files(DownloadFilter(file_types=["VYPIS"]), Path("/tmp"))
+    dm.download_new_files.assert_awaited_once()
+    assert isinstance(result, DownloadBatchResult)
 
 
-@patch("csob_ceb_bc.client.SoapGateway")
-@patch("csob_ceb_bc.client.RestTransferClient")
+@pytest.mark.asyncio
+@patch("csob_ceb_bc.client.AsyncSoapGateway")
+@patch("csob_ceb_bc.client.AsyncRestTransferClient")
 @patch("csob_ceb_bc.client.SqliteStateRepository")
-def test_poll_import_protocols_default_dir(mock_state, mock_rest, mock_soap):
+async def test_poll_import_protocols_default_dir(mock_state, mock_rest, mock_soap):
     config = _config()
     cert_store = MagicMock()
     cert_store.cert_path.read_bytes.return_value = b"cert"
 
     ipm = MagicMock()
-    ipm.poll_import_protocols.return_value = []
+    ipm.poll_import_protocols = AsyncMock(return_value=DownloadBatchResult())
 
     client = BusinessConnectorClient(
         config=config,
@@ -68,21 +72,22 @@ def test_poll_import_protocols_default_dir(mock_state, mock_rest, mock_soap):
     )
     client._import_protocol_manager = ipm
 
-    result = client.poll_import_protocols()
-    ipm.poll_import_protocols.assert_called_once_with(Path("."))
-    assert result == []
+    result = await client.poll_import_protocols()
+    ipm.poll_import_protocols.assert_awaited_once_with(Path("."))
+    assert isinstance(result, DownloadBatchResult)
 
 
-@patch("csob_ceb_bc.client.SoapGateway")
-@patch("csob_ceb_bc.client.RestTransferClient")
+@pytest.mark.asyncio
+@patch("csob_ceb_bc.client.AsyncSoapGateway")
+@patch("csob_ceb_bc.client.AsyncRestTransferClient")
 @patch("csob_ceb_bc.client.SqliteStateRepository")
-def test_resume_pending_delegates(mock_state, mock_rest, mock_soap):
+async def test_resume_pending_delegates(mock_state, mock_rest, mock_soap):
     config = _config()
     cert_store = MagicMock()
     cert_store.cert_path.read_bytes.return_value = b"cert"
 
     um = MagicMock()
-    um.resume_pending.return_value = []
+    um.resume_pending = AsyncMock(return_value=[])
 
     client = BusinessConnectorClient(
         config=config,
@@ -93,20 +98,21 @@ def test_resume_pending_delegates(mock_state, mock_rest, mock_soap):
     )
     client._upload_manager = um
 
-    client.resume_pending()
-    um.resume_pending.assert_called_once()
+    await client.resume_pending()
+    um.resume_pending.assert_awaited_once()
 
 
-@patch("csob_ceb_bc.client.SoapGateway")
-@patch("csob_ceb_bc.client.RestTransferClient")
+@pytest.mark.asyncio
+@patch("csob_ceb_bc.client.AsyncSoapGateway")
+@patch("csob_ceb_bc.client.AsyncRestTransferClient")
 @patch("csob_ceb_bc.client.SqliteStateRepository")
-def test_upload_payment_batch_delegates(mock_state, mock_rest, mock_soap):
+async def test_upload_payment_batch_delegates(mock_state, mock_rest, mock_soap):
     config = _config()
     cert_store = MagicMock()
     cert_store.cert_path.read_bytes.return_value = b"cert"
 
     um = MagicMock()
-    um.upload_payment_batch.return_value = None
+    um.upload_payment_batch = AsyncMock(return_value=None)
 
     client = BusinessConnectorClient(
         config=config,
@@ -119,6 +125,6 @@ def test_upload_payment_batch_delegates(mock_state, mock_rest, mock_soap):
 
     file_path = FIXTURES / "certs" / "test.pem"
     metadata = UploadFile(filename="test.xml", format="XML SEPA", mode=UploadMode.AllOrNothing)
-    result = client.upload_payment_batch(file_path, metadata)
-    um.upload_payment_batch.assert_called_once()
+    result = await client.upload_payment_batch(file_path, metadata)
+    um.upload_payment_batch.assert_awaited_once()
     assert result is None

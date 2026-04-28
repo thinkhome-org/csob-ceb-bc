@@ -22,7 +22,7 @@
 | SOAP 1012 | Certificate blocked | Security incident, contact bank |
 | HTTP 400/404 | URL expired | File >15 days old, no recovery |
 | Upload R | Duplicate or invalid | Check hash, format, filename |
-| High pending | Crash or network issue | Run `client.resume_pending()` |
+| High pending | Crash or network issue | Run `await client.resume_pending()` |
 
 ## Certificate Renewal
 

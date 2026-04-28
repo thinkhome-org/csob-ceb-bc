@@ -11,6 +11,7 @@ from csob_ceb_bc.config import ConnectorConfig, Environment
 from csob_ceb_bc.errors import CsobBCProtocolError, CsobBCRateLimitError
 from csob_ceb_bc.models import (
     DownloadFile,
+    DownloadFileFormat,
     DownloadFileStatus,
     DownloadFileType,
     DownloadFilter,
@@ -140,6 +141,11 @@ class SoapGateway:
         filter: DownloadFilter | None = None,
     ) -> DownloadListResult:
         self._check_rate_limit()
+        if prev_query_timestamp is not None and prev_query_timestamp.tzinfo is None:
+            raise CsobBCProtocolError(
+                "prev_query_timestamp must be timezone-aware (e.g. datetime.now(UTC))",
+                operation="GetDownloadFileList",
+            )
         request: dict[str, Any] = {"ContractNumber": self._config.contract_number}
         if prev_query_timestamp is not None:
             request["PrevQueryTimestamp"] = prev_query_timestamp.isoformat()
@@ -148,7 +154,9 @@ class SoapGateway:
             if filter.file_types:
                 filter_dict["FileTypes"] = {"FileType": [ft.value for ft in filter.file_types]}
             if filter.file_formats:
-                filter_dict["FileFormats"] = {"FileFormat": filter.file_formats}
+                filter_dict["FileFormats"] = {
+                    "FileFormat": [ff.value for ff in filter.file_formats]
+                }
             if filter.filename:
                 filter_dict["FileName"] = filter.filename
             if filter.created_after is not None:
@@ -187,7 +195,9 @@ class SoapGateway:
                     DownloadFile(
                         filename=self._get_value(fd, "Filename", ""),
                         type=DownloadFileType(self._get_value(fd, "Type", "VYPIS")),
-                        format=self._get_value(fd, "Format"),
+                        format=DownloadFileFormat(self._get_value(fd, "Format"))
+                        if self._get_value(fd, "Format")
+                        else None,
                         creation_date_time=cdt,
                         size=self._get_value(fd, "Size"),
                         status=DownloadFileStatus(self._get_value(fd, "Status", "R")),

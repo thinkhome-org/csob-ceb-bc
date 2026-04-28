@@ -25,7 +25,7 @@ This prevents missing files that are still being prepared by the bank.
 ```python
 from csob_ceb_bc.models import DownloadFilter, DownloadFileType
 
-files = client.download_new_files(
+files = await client.download_new_files(
     filter=DownloadFilter(file_types=["VYPIS", "AVIZO"]),
     target_dir=Path("/data/inbox"),
 )

@@ -89,6 +89,16 @@ def test_get_download_file_list_v4_missing_timestamp(mock_client_cls: MagicMock)
     assert len(result.files) == 0
 
 
+def test_get_download_file_list_v4_rejects_naive_timestamp():
+    from csob_ceb_bc.errors import CsobBCProtocolError
+
+    gw = SoapGateway(_config(), wsdl_path=str(FIXTURES / "soap" / "mock_wsdl.xml"))
+    with pytest.raises(CsobBCProtocolError, match="timezone-aware"):
+        gw.get_download_file_list_v4(
+            prev_query_timestamp=datetime(2025, 1, 1, 0, 0, 0),  # naive
+        )
+
+
 @patch("csob_ceb_bc.soap.gateway.zeep.Client")
 def test_soap_fault_mapped(mock_client_cls: MagicMock):
     mock_client = MagicMock()
@@ -283,7 +293,7 @@ def test_get_download_file_list_v4_full_filter(mock_client_cls: MagicMock):
     result = gw.get_download_file_list_v4(
         filter=DownloadFilter(
             file_types=["VYPIS"],
-            file_formats=["PDF", "CSV"],
+            file_formats=["PDF", "XML"],
             filename="stmt",
             created_after=datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC),
             created_before=datetime(2025, 1, 20, 0, 0, 0, tzinfo=UTC),
@@ -292,7 +302,7 @@ def test_get_download_file_list_v4_full_filter(mock_client_cls: MagicMock):
     )
     call_args = mock_client.service.GetDownloadFileList_v4.call_args[1]
     assert call_args["Filter"]["FileTypes"] == {"FileType": ["VYPIS"]}
-    assert call_args["Filter"]["FileFormats"] == {"FileFormat": ["PDF", "CSV"]}
+    assert call_args["Filter"]["FileFormats"] == {"FileFormat": ["PDF", "XML"]}
     assert call_args["Filter"]["FileName"] == "stmt"
     assert call_args["Filter"]["CreatedAfter"] == "2025-01-01T00:00:00+00:00"
     assert call_args["Filter"]["CreatedBefore"] == "2025-01-20T00:00:00+00:00"

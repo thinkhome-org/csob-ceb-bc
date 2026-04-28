@@ -23,7 +23,7 @@ Uploads are deduplicated by SHA256 hash. Once an upload finishes with `I` or `R`
 If the process crashes after REST upload but before finish:
 
 ```python
-client.resume_pending()
+await client.resume_pending()
 ```
 
 This resumes all uploads with `NewFileId` stored but not finished.

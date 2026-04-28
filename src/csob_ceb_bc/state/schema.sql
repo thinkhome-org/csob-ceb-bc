@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS upload_attempts (
     mode TEXT,
     status TEXT,
     start_url TEXT,
+    local_path TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

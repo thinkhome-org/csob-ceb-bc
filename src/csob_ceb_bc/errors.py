@@ -88,6 +88,22 @@ class CsobBCPermanentError(CsobBCError):
         super().__init__(message, **kwargs)
 
 
+class CsobBCServerError(CsobBCRetryableError):
+    """SOAP fault 1000 – general server error."""
+
+
+class CsobBCContractDisabledError(CsobBCPermanentError):
+    """SOAP fault 1002 – contract has BC disabled."""
+
+
+class CsobBCNotRegisteredError(CsobBCPermanentError):
+    """SOAP fault 1011 – certificate not registered or contract inactive."""
+
+
+class CsobBCBlockedError(CsobBCPermanentError):
+    """SOAP fault 1012 – certificate blocked for BC use."""
+
+
 class CsobBCRateLimitError(CsobBCRetryableError):
     """SOAP 1101 or HTTP 429 rate limit."""
 

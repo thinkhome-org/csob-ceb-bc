@@ -1,5 +1,7 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from csob_ceb_bc.client import BusinessConnectorClient
 from csob_ceb_bc.config import CertificateConfig, ConnectorConfig, Environment
@@ -19,10 +21,11 @@ def _config() -> ConnectorConfig:
 
 
 @patch("csob_ceb_bc.client.SoapGateway")
-@patch("csob_ceb_bc.client.RestTransferClient")
+@patch("csob_ceb_bc.client.AsyncSoapGateway")
+@patch("csob_ceb_bc.client.AsyncRestTransferClient")
 @patch("csob_ceb_bc.client.SqliteStateRepository")
 @patch("csob_ceb_bc.client.CertificateStore")
-def test_from_config_creates_client(mock_cert, mock_state, mock_rest, mock_soap):
+def test_from_config_creates_client(mock_cert, mock_state, mock_rest, mock_async_soap, mock_soap):
     mock_cert_instance = MagicMock()
     mock_cert_instance.cert_path.read_bytes.return_value = b"cert"
     mock_cert.return_value = mock_cert_instance
@@ -30,30 +33,35 @@ def test_from_config_creates_client(mock_cert, mock_state, mock_rest, mock_soap)
     assert client is not None
 
 
+@pytest.mark.asyncio
 @patch("csob_ceb_bc.client.SoapGateway")
-@patch("csob_ceb_bc.client.RestTransferClient")
+@patch("csob_ceb_bc.client.AsyncSoapGateway")
+@patch("csob_ceb_bc.client.AsyncRestTransferClient")
 @patch("csob_ceb_bc.client.SqliteStateRepository")
 @patch("csob_ceb_bc.client.CertificateStore")
-def test_list_available_files_delegates(mock_cert, mock_state, mock_rest, mock_soap):
+async def test_list_available_files_delegates(
+    mock_cert, mock_state, mock_rest, mock_async_soap, mock_soap
+):
     mock_cert_instance = MagicMock()
     mock_cert_instance.cert_path.read_bytes.return_value = b"cert"
     mock_cert.return_value = mock_cert_instance
     client = BusinessConnectorClient.from_config(_config())
     dm = MagicMock()
+    dm.list_available_files = AsyncMock(return_value=[])
     client._download_manager = dm
-    dm.list_available_files.return_value = []
-    result = client.list_available_files(DownloadFilter())
+    result = await client.list_available_files(DownloadFilter())
     assert result == []
-    dm.list_available_files.assert_called_once()
+    dm.list_available_files.assert_awaited_once()
 
 
 @patch("csob_ceb_bc.client.SoapGateway")
-@patch("csob_ceb_bc.client.RestTransferClient")
+@patch("csob_ceb_bc.client.AsyncSoapGateway")
+@patch("csob_ceb_bc.client.AsyncRestTransferClient")
 @patch("csob_ceb_bc.client.SqliteStateRepository")
 @patch("csob_ceb_bc.client.CertificateStore")
 @patch("csob_ceb_bc.client.TokenBucketRateLimiter")
 def test_from_config_production_creates_rate_limiter(
-    mock_rl, mock_cert, mock_state, mock_rest, mock_soap
+    mock_rl, mock_cert, mock_state, mock_rest, mock_async_soap, mock_soap
 ):
     mock_cert_instance = MagicMock()
     mock_cert_instance.cert_path.read_bytes.return_value = b"cert"

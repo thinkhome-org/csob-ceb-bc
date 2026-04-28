@@ -23,6 +23,7 @@ class RateLimitConfig(BaseModel):
     soap_calls: int = 30
     per_seconds: int = 1200
     default_poll_seconds: int = 60
+    short_poll_seconds: int = 10
 
 
 class LoggingConfig(BaseModel):
@@ -64,9 +65,17 @@ class ConnectorConfig(BaseSettings):
 
     @field_validator("client_app_guid")
     @classmethod
-    def _guid_not_empty(cls, v: str) -> str:
-        if not v:
-            raise ValueError("client_app_guid is required")
+    def _guid_format(cls, v: str) -> str:
+        import re
+
+        if not re.fullmatch(
+            r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            v,
+        ):
+            raise ValueError(
+                "client_app_guid must be a UUID in format "
+                "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            )
         return v
 
     @field_validator("contract_number")

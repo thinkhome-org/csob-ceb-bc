@@ -42,6 +42,24 @@
 					<xs:field xpath="."/>
 				</xs:unique>
 			</xs:element>
+			<xs:element name="FileFormats" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of formats of download file.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="FileFormat" type="xs:token" maxOccurs="unbounded">
+							<xs:annotation>
+								<xs:documentation>Format of file (PDF, TXT, XML, BBGPC, BBMT940, BBTXT, BBBBF, SEPAXML, MT942, BBF, CAMT052)</xs:documentation>
+							</xs:annotation>
+						</xs:element>
+					</xs:sequence>
+				</xs:complexType>
+				<xs:unique name="Unique_FileFormat">
+					<xs:selector xpath="tns:FileFormat"/>
+					<xs:field xpath="."/>
+				</xs:unique>
+			</xs:element>
 			<xs:element name="FileName" type="xs:string" minOccurs="0">
 				<xs:annotation>
 					<xs:documentation>Filename incl. extension.</xs:documentation>

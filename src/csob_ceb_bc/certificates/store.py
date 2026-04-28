@@ -114,6 +114,52 @@ class CertificateStore:
         except Exception as exc:
             raise CsobBCCertificateError(f"Certificate validation failed: {exc}") from exc
 
+    def validate_key_matches_cert(self) -> None:
+        """Verify that the configured private key corresponds to the certificate public key."""
+        try:
+            cert = self._cert
+            from cryptography.hazmat.primitives.asymmetric import rsa
+
+            cert_public_key = cert.public_key()
+            if not isinstance(cert_public_key, rsa.RSAPublicKey):
+                raise CsobBCCertificateError(
+                    "Certificate public key is not RSA",
+                    permanent=True,
+                    retryable=False,
+                )
+
+            key_pem = self.key_path.read_bytes()
+            from cryptography.hazmat.primitives import serialization
+
+            private_key = serialization.load_pem_private_key(
+                key_pem, password=None, backend=default_backend()
+            )
+            private_public_key = private_key.public_key()
+            if not isinstance(private_public_key, rsa.RSAPublicKey):
+                raise CsobBCCertificateError(
+                    "Private key public key is not RSA",
+                    permanent=True,
+                    retryable=False,
+                )
+
+            if (
+                cert_public_key.public_numbers().n != private_public_key.public_numbers().n
+                or cert_public_key.public_numbers().e != private_public_key.public_numbers().e
+            ):
+                raise CsobBCCertificateError(
+                    "Certificate public key does not match private key",
+                    permanent=True,
+                    retryable=False,
+                )
+        except CsobBCCertificateError:
+            raise
+        except Exception as exc:
+            raise CsobBCCertificateError(
+                f"Key/certificate match validation failed: {exc}",
+                permanent=True,
+                retryable=False,
+            ) from exc
+
     def validate_certificate(self) -> None:
         """Verify certificate meets ČSOB requirements (SHA256+, RSA 2048+, KU/EKU if present)."""
         try:

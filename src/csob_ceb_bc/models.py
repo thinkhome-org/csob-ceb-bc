@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -12,6 +13,28 @@ class DownloadFileType(StrEnum):
     AVIZO = "AVIZO"
     KURZY = "KURZY"
     IMPPROT = "IMPPROT"
+
+
+class DownloadFileFormat(StrEnum):
+    """Allowed file formats for GetDownloadFileList filter.
+
+    Per manual §3.2.1.1:
+    – Statements (VYPIS): PDF, TXT, XML, BBGPC, BBMT940, BBTXT, BBBBF, SEPAXML
+    – Avíza (AVIZO): MT942, BBF, CAMT052
+    – Exchange rates (KURZY): format is ignored by the service
+    """
+
+    PDF = "PDF"
+    TXT = "TXT"
+    XML = "XML"
+    BBGPC = "BBGPC"
+    BBMT940 = "BBMT940"
+    BBTXT = "BBTXT"
+    BBBBF = "BBBBF"
+    SEPAXML = "SEPAXML"
+    MT942 = "MT942"
+    BBF = "BBF"
+    CAMT052 = "CAMT052"
 
 
 class DownloadFileStatus(StrEnum):
@@ -41,7 +64,7 @@ class DownloadFilter(BaseModel):
     """Filter for GetDownloadFileList v4."""
 
     file_types: list[DownloadFileType] | None = None
-    file_formats: list[str] | None = None
+    file_formats: list[DownloadFileFormat] | None = None
     filename: str | None = None
     created_after: datetime | None = None
     created_before: datetime | None = None
@@ -49,18 +72,49 @@ class DownloadFilter(BaseModel):
 
     model_config = {"frozen": True}
 
+    @field_validator("created_after", "created_before")
+    @classmethod
+    def _datetime_must_be_tz_aware(cls, v: datetime | None) -> datetime | None:
+        """Manual §3.2.1.1 requires xsd:dateTime format YYYY-MM-DDTHH:MM:SS+ZZ:ZZ."""
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            raise ValueError("datetime must be timezone-aware (e.g. datetime.now(UTC))")
+        return v
+
+    @field_validator("client_app_guid")
+    @classmethod
+    def _guid_format(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not re.fullmatch(
+            r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            v,
+        ):
+            raise ValueError(
+                "client_app_guid must be a UUID in format "
+                "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            )
+        return v
+
 
 class DownloadFile(BaseModel):
     """File detail from SOAP response."""
 
     filename: str
     type: DownloadFileType
-    format: str | None = None
+    format: DownloadFileFormat | None = None
     creation_date_time: datetime
     size: int | None = None
     status: DownloadFileStatus
     url: str | None = None
-    upload_file_hash: str | None = None
+    upload_file_hash: str | None = Field(
+        default=None,
+        description=(
+            "SHA256 hash of the original uploaded file. "
+            "Present only for IMPPROT (import protocol) files."
+        ),
+    )
     ticket_id: str | None = None
 
     model_config = {"frozen": True}
@@ -102,11 +156,11 @@ class UploadFile(BaseModel):
 
     @field_validator("hash")
     @classmethod
-    def _hash_must_be_hex(cls, v: str | None) -> str | None:
+    def _hash_must_be_sha256(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        if len(v) not in (32, 64):
-            raise ValueError("hash must be 32 hex characters (MD5) or 64 hex characters (SHA256)")
+        if len(v) != 64:
+            raise ValueError("hash must be 64 hex characters (SHA256)")
         try:
             int(v, 16)
         except ValueError as exc:
@@ -134,6 +188,19 @@ class UploadStartResult(BaseModel):
 
     model_config = {"frozen": True}
 
+    @field_validator("hash")
+    @classmethod
+    def _hash_must_be_sha256(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if len(v) != 64:
+            raise ValueError("hash must be 64 hex characters (SHA256)")
+        try:
+            int(v, 16)
+        except ValueError as exc:
+            raise ValueError("hash must be valid hex") from exc
+        return v
+
 
 class RestUploadResult(BaseModel):
     """Parsed JSON response from REST upload POST."""
@@ -145,6 +212,27 @@ class RestUploadResult(BaseModel):
     model_config = {"frozen": True, "populate_by_name": True}
 
 
+class DownloadBatchResult(BaseModel):
+    """Result of a download batch operation."""
+
+    downloaded: list[DownloadFile] = Field(default_factory=list)
+    pending: list[DownloadFile] = Field(default_factory=list)
+    failed: list[DownloadFile] = Field(default_factory=list)
+    cursor_advanced: bool = False
+    query_timestamp: datetime | None = None
+
+    model_config = {"frozen": True}
+
+    def __len__(self) -> int:
+        """Return number of downloaded files for backward compatibility."""
+        return len(self.downloaded)
+
+    @property
+    def has_pending_files(self) -> bool:
+        """True if any files are still being prepared (status R without URL)."""
+        return len(self.pending) > 0
+
+
 class UploadFinishResult(BaseModel):
     """Result of FinishUploadFileList v2 for a single file."""
 
@@ -154,6 +242,17 @@ class UploadFinishResult(BaseModel):
     ticket_id: str | None = None
 
     model_config = {"frozen": True}
+
+    @field_validator("hash")
+    @classmethod
+    def _hash_must_be_sha256(cls, v: str) -> str:
+        if len(v) != 64:
+            raise ValueError("hash must be 64 hex characters (SHA256)")
+        try:
+            int(v, 16)
+        except ValueError as exc:
+            raise ValueError("hash must be valid hex") from exc
+        return v
 
 
 class ImportProtocolRecord(BaseModel):

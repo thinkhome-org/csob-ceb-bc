@@ -14,7 +14,7 @@ def _config() -> ConnectorConfig:
     return ConnectorConfig(
         environment=Environment.DEMO,
         contract_number="123456",
-        client_app_guid="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         certificate=CertificateConfig(
             cert_file=FIXTURES / "certs" / "test.pem",
             key_file=FIXTURES / "certs" / "test.key",
@@ -23,8 +23,8 @@ def _config() -> ConnectorConfig:
     )
 
 
-@patch("csob_ceb_bc.client.SoapGateway")
-@patch("csob_ceb_bc.client.RestTransferClient")
+@patch("csob_ceb_bc.client.AsyncSoapGateway")
+@patch("csob_ceb_bc.client.AsyncRestTransferClient")
 @patch("csob_ceb_bc.client.SqliteStateRepository")
 def test_metrics_snapshot_returns_data(mock_state, mock_rest, mock_soap):
     config = _config()
@@ -46,8 +46,8 @@ def test_metrics_snapshot_returns_data(mock_state, mock_rest, mock_soap):
     assert snap["counters"]["download_soap_calls"] == 5
 
 
-@patch("csob_ceb_bc.client.SoapGateway")
-@patch("csob_ceb_bc.client.RestTransferClient")
+@patch("csob_ceb_bc.client.AsyncSoapGateway")
+@patch("csob_ceb_bc.client.AsyncRestTransferClient")
 @patch("csob_ceb_bc.client.SqliteStateRepository")
 def test_default_metrics_collector(mock_state, mock_rest, mock_soap):
     config = _config()

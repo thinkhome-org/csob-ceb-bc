@@ -10,13 +10,15 @@ from csob_ceb_bc.downloads.manager import DownloadManager
 from csob_ceb_bc.import_protocols.manager import ImportProtocolManager
 from csob_ceb_bc.metrics import MetricsCollector
 from csob_ceb_bc.models import (
+    DownloadBatchResult,
     DownloadFile,
     DownloadFilter,
     UploadFile,
     UploadFinishResult,
 )
 from csob_ceb_bc.rate_limit import TokenBucketRateLimiter
-from csob_ceb_bc.rest.transfer import RestTransferClient
+from csob_ceb_bc.rest.async_transfer import AsyncRestTransferClient
+from csob_ceb_bc.soap.async_gateway import AsyncSoapGateway
 from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.sqlite_repo import SqliteStateRepository
 from csob_ceb_bc.uploads.manager import UploadManager
@@ -29,8 +31,8 @@ class BusinessConnectorClient:
         self,
         *,
         config: ConnectorConfig,
-        soap: SoapGateway,
-        rest: RestTransferClient,
+        soap: AsyncSoapGateway,
+        rest: AsyncRestTransferClient,
         state: SqliteStateRepository,
         cert_store: CertificateStore,
         metrics: MetricsCollector | None = None,
@@ -77,6 +79,7 @@ class BusinessConnectorClient:
     def from_config(cls, config: ConnectorConfig) -> BusinessConnectorClient:
         cert_store = CertificateStore(config.certificate)
         cert_store.validate_certificate()
+        cert_store.validate_key_matches_cert()
         cert_store.validate_not_expiring()
         state = SqliteStateRepository(config.state_url)
         rate_limiter = None
@@ -85,8 +88,10 @@ class BusinessConnectorClient:
                 capacity=config.rate_limit.soap_calls,
                 refill_per_second=config.rate_limit.soap_calls / config.rate_limit.per_seconds,
             )
-        soap = SoapGateway(config, rate_limiter=rate_limiter, cert_store=cert_store)
-        rest = RestTransferClient(
+        soap = AsyncSoapGateway(
+            SoapGateway(config, rate_limiter=rate_limiter, cert_store=cert_store)
+        )
+        rest = AsyncRestTransferClient(
             cert_store=cert_store,
             timeout=None,  # uses defaults
         )
@@ -98,31 +103,31 @@ class BusinessConnectorClient:
             cert_store=cert_store,
         )
 
-    def list_available_files(self, filter: DownloadFilter) -> list[DownloadFile]:
-        return self._download_manager.list_available_files(filter)
+    async def list_available_files(self, filter: DownloadFilter) -> list[DownloadFile]:
+        return await self._download_manager.list_available_files(filter)
 
-    def download_new_files(
+    async def download_new_files(
         self,
         filter: DownloadFilter,
         target_dir: Path,
-    ) -> list[DownloadFile]:
-        return self._download_manager.download_new_files(filter, target_dir)
+    ) -> DownloadBatchResult:
+        return await self._download_manager.download_new_files(filter, target_dir)
 
-    def upload_payment_batch(
+    async def upload_payment_batch(
         self,
         file: Path,
         metadata: UploadFile,
     ) -> UploadFinishResult | None:
-        return self._upload_manager.upload_payment_batch(file, metadata)
+        return await self._upload_manager.upload_payment_batch(file, metadata)
 
-    def poll_import_protocols(self, target_dir: Path | None = None) -> list[DownloadFile]:
+    async def poll_import_protocols(self, target_dir: Path | None = None) -> DownloadBatchResult:
         if target_dir is None:
             target_dir = Path(".")
-        return self._import_protocol_manager.poll_import_protocols(target_dir)
+        return await self._import_protocol_manager.poll_import_protocols(target_dir)
 
-    def resume_pending(self) -> None:
+    async def resume_pending(self) -> list[UploadFinishResult]:
         """Resume any pending uploads or downloads after a crash."""
-        self._upload_manager.resume_pending()
+        return await self._upload_manager.resume_pending()
 
     def metrics_snapshot(self) -> dict[str, Any]:
         """Return current metrics snapshot."""

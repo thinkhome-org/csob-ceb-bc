@@ -458,6 +458,42 @@ def test_validate_certificate_eku_without_client_auth():
     assert "Client Authentication" in str(exc_info.value)
 
 
+def test_validate_key_matches_cert_success():
+    store = CertificateStore(
+        CertificateConfig(
+            cert_file=FIXTURES / "certs" / "valid.pem",
+            key_file=FIXTURES / "certs" / "valid.key",
+        )
+    )
+    store.validate_key_matches_cert()
+
+
+def test_validate_key_matches_cert_mismatch():
+    store = CertificateStore(
+        CertificateConfig(
+            cert_file=FIXTURES / "certs" / "test.pem",
+            key_file=FIXTURES / "certs" / "valid.key",
+        )
+    )
+    with pytest.raises(CsobBCCertificateError) as exc_info:
+        store.validate_key_matches_cert()
+    assert "does not match" in str(exc_info.value).lower()
+
+
+def test_validate_key_matches_cert_corrupted_key(tmp_path: Path):
+    bad_key = tmp_path / "bad.key"
+    bad_key.write_text("not a valid key")
+    store = CertificateStore(
+        CertificateConfig(
+            cert_file=FIXTURES / "certs" / "valid.pem",
+            key_file=bad_key,
+        )
+    )
+    with pytest.raises(CsobBCCertificateError) as exc_info:
+        store.validate_key_matches_cert()
+    assert "validation failed" in str(exc_info.value).lower()
+
+
 def test_validate_certificate_unexpected_error():
     store = CertificateStore(
         CertificateConfig(

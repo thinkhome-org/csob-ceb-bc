@@ -15,7 +15,7 @@ Protocols are paired with uploads by `UploadFileHash` (SHA256).
 ## Usage
 
 ```python
-protocols = client.poll_import_protocols(target_dir=Path("/data/protocols"))
+protocols = await client.poll_import_protocols(target_dir=Path("/data/protocols"))
 ```
 
 ## Format

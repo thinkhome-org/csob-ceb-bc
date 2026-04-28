@@ -22,6 +22,7 @@ class StateRepository(ABC):
         size: int,
         file_format: str,
         mode: str,
+        local_path: str | None = None,
     ) -> None: ...
 
     @abstractmethod

@@ -31,7 +31,7 @@ File may already have been imported, or format is invalid. Check logs for `ticke
 If the process crashes mid-upload:
 
 ```python
-client.resume_pending()
+await client.resume_pending()
 ```
 
 This finds uploads with `NewFileId` stored but not finished, and calls `FinishUploadFileList`.

@@ -1,8 +1,9 @@
-# Async REST API
+# Async API
 
 ## Overview
 
-For high-throughput or concurrent workloads, use `AsyncRestTransferClient` with `httpx.AsyncClient`.
+The SDK is async-only. Use `BusinessConnectorClient` inside an asyncio event loop, or
+use `AsyncRestTransferClient` directly for low-level REST transfers.
 
 ## Installation
 
@@ -15,39 +16,32 @@ pip install "csob-ceb-business-connector-sdk[async]"
 ```python
 import asyncio
 from pathlib import Path
-from csob_ceb_bc.certificates.store import CertificateStore
-from csob_ceb_bc.config import CertificateConfig
-from csob_ceb_bc.rest.async_transfer import AsyncRestTransferClient
-
-store = CertificateStore(CertificateConfig(
-    cert_file=Path("/secure/cert.crt"),
-    key_file=Path("/secure/key.key"),
-))
-client = AsyncRestTransferClient(cert_store=store)
+from csob_ceb_bc import BusinessConnectorClient, CertificateConfig, ConnectorConfig, Environment
+from csob_ceb_bc.models import DownloadFilter
 
 async def main():
-    result = await client.download_to_file(
-        "https://example.com/file", Path("/data/inbox/file.bin")
+    client = BusinessConnectorClient.from_config(
+        ConnectorConfig(
+            environment=Environment.PRODUCTION,
+            contract_number="123456",
+            client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            certificate=CertificateConfig(
+                cert_file=Path("/secure/cert.crt"),
+                key_file=Path("/secure/key.key"),
+            ),
+        )
     )
-    print(f"Downloaded {result.bytes_transferred} bytes")
 
-    upload = await client.upload_multipart(
-        "https://example.com/upload", Path("/data/outbox/pay.xml"), "pay.xml"
+    result = await client.download_new_files(
+        DownloadFilter(file_types=["VYPIS"]),
+        Path("/data/inbox"),
     )
-    print(f"NewFileId: {upload.new_file_id}")
+    print(f"Downloaded {len(result.downloaded)} files")
 
 asyncio.run(main())
 ```
 
-## Differences from Sync Client
-
-| Feature | `RestTransferClient` | `AsyncRestTransferClient` |
-|---|---|---|
-| HTTP client | `httpx.Client` | `httpx.AsyncClient` |
-| Download | `iter_bytes()` | `aiter_bytes()` |
-| Upload | `client.post()` | `await client.post()` |
-| Retry | `tenacity` sync | `tenacity` async-aware |
-
 ## Thread Safety
 
-`AsyncRestTransferClient` is designed for asyncio event loops. Do not share instances across threads without an event loop per thread.
+`BusinessConnectorClient` and `AsyncRestTransferClient` are designed for asyncio event loops.
+Do not share instances across threads without an event loop per thread.

@@ -1,19 +1,34 @@
 from __future__ import annotations
 
+from enum import StrEnum
+
 from csob_ceb_bc.errors import (
+    CsobBCBlockedError,
+    CsobBCContractDisabledError,
     CsobBCError,
-    CsobBCPermanentError,
+    CsobBCNotRegisteredError,
     CsobBCRateLimitError,
-    CsobBCRetryableError,
+    CsobBCServerError,
     CsobBCSoapFault,
 )
 
+
+class SoapFaultCode(StrEnum):
+    """Known ČSOB BC SOAP fault codes."""
+
+    SERVER_ERROR = "1000"
+    CONTRACT_DISABLED = "1002"
+    NOT_REGISTERED = "1011"
+    BLOCKED = "1012"
+    RATE_LIMIT = "1101"
+
+
 _FAULT_MAP: dict[str, type[CsobBCError]] = {
-    "1000": CsobBCRetryableError,
-    "1002": CsobBCPermanentError,
-    "1011": CsobBCPermanentError,
-    "1012": CsobBCPermanentError,
-    "1101": CsobBCRateLimitError,
+    SoapFaultCode.SERVER_ERROR: CsobBCServerError,
+    SoapFaultCode.CONTRACT_DISABLED: CsobBCContractDisabledError,
+    SoapFaultCode.NOT_REGISTERED: CsobBCNotRegisteredError,
+    SoapFaultCode.BLOCKED: CsobBCBlockedError,
+    SoapFaultCode.RATE_LIMIT: CsobBCRateLimitError,
 }
 
 

@@ -1,6 +1,7 @@
+"""Async version of ImportProtocolManager."""
+
 from __future__ import annotations
 
-import asyncio
 import hashlib
 from pathlib import Path
 
@@ -15,21 +16,21 @@ from csob_ceb_bc.models import (
     DownloadFilter,
 )
 from csob_ceb_bc.rest.async_transfer import AsyncRestTransferClient
-from csob_ceb_bc.soap.async_gateway import AsyncSoapGateway
+from csob_ceb_bc.soap.gateway import SoapGateway
 from csob_ceb_bc.state.base import StateRepository
 
 logger = get_logger("csob_ceb_bc.import_protocols")
 
 
-class ImportProtocolManager:
+class AsyncImportProtocolManager:
     def __init__(
         self,
         *,
         contract_number: str,
         client_app_guid: str,
         environment: str,
-        soap: AsyncSoapGateway,
-        rest: AsyncRestTransferClient,
+        soap: SoapGateway,
+        async_rest: AsyncRestTransferClient,
         state: StateRepository,
         metrics: MetricsCollector | None = None,
     ) -> None:
@@ -37,21 +38,22 @@ class ImportProtocolManager:
         self._client_app_guid = client_app_guid
         self._environment = environment
         self._soap = soap
-        self._rest = rest
+        self._async_rest = async_rest
         self._state = state
         self._metrics = metrics
 
     def _profile_key(self) -> str:
         raw = (
-            f"{self._environment}:{self._contract_number}:{self._client_app_guid}:import_protocols"
+            f"{self._environment}:{self._contract_number}:"
+            f"{self._client_app_guid}:import_protocols"
         )
         return hashlib.sha256(raw.encode()).hexdigest()
 
     async def poll_import_protocols(self, target_dir: Path) -> DownloadBatchResult:
-        await asyncio.to_thread(target_dir.mkdir, parents=True, exist_ok=True)
+        target_dir.mkdir(parents=True, exist_ok=True)
         key = self._profile_key()
-        prev = await asyncio.to_thread(self._state.get_profile_cursor, key)
-        result = await self._soap.get_download_file_list_v4(
+        prev = self._state.get_profile_cursor(key)
+        result = self._soap.get_download_file_list_v4(
             prev_query_timestamp=prev,
             filter=DownloadFilter(
                 file_types=[DownloadFileType.IMPPROT],
@@ -91,9 +93,9 @@ class ImportProtocolManager:
                 try:
                     if self._metrics:
                         with timed(self._metrics, "import_protocol_download_latency_seconds"):
-                            await self._rest.download_to_file(file.url, local_path)
+                            await self._async_rest.download_to_file(file.url, local_path)
                     else:
-                        await self._rest.download_to_file(file.url, local_path)
+                        await self._async_rest.download_to_file(file.url, local_path)
                 except CsobBCHttpError as exc:
                     if exc.permanent:
                         failed.append(file)
@@ -105,8 +107,7 @@ class ImportProtocolManager:
                         continue
                     raise
                 downloaded.append(file)
-                await asyncio.to_thread(
-                    self._state.create_import_protocol,
+                self._state.create_import_protocol(
                     new_file_id=file.filename,
                     upload_hash=file.upload_file_hash,
                     filename=file.filename,
@@ -117,7 +118,7 @@ class ImportProtocolManager:
 
         cursor_advanced = len(pending) == 0
         if cursor_advanced:
-            await asyncio.to_thread(self._state.set_profile_cursor, key, result.query_timestamp)
+            self._state.set_profile_cursor(key, result.query_timestamp)
 
         return DownloadBatchResult(
             downloaded=downloaded,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from cryptography import x509
@@ -23,10 +23,13 @@ def check(cert_path: Path, min_days: int) -> None:
         print(f"Valid from: {cert.not_valid_before_utc}")
     if cert.not_valid_after_utc:
         print(f"Valid until: {cert.not_valid_after_utc}")
-        days_left = (cert.not_valid_after_utc - datetime.now(timezone.utc)).days
+        days_left = (cert.not_valid_after_utc - datetime.now(UTC)).days
         print(f"Days left: {days_left}")
         if days_left < min_days:
-            print(f"WARNING: Certificate expires in {days_left} days (minimum {min_days})", file=sys.stderr)
+            print(
+                f"WARNING: Certificate expires in {days_left} days (minimum {min_days})",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
     print("OK")

@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -15,7 +15,10 @@ def test_cli_no_args_prints_help():
 @patch("csob_ceb_bc.__main__.BusinessConnectorClient")
 def test_cli_download(mock_client_cls: MagicMock):
     mock_client = MagicMock()
-    mock_client.download_new_files.return_value = []
+    batch_mock = MagicMock()
+    batch_mock.downloaded = []
+    batch_mock.pending = []
+    mock_client.download_new_files = AsyncMock(return_value=batch_mock)
     mock_client_cls.from_config.return_value = mock_client
 
     result = main(
@@ -42,7 +45,7 @@ def test_cli_download(mock_client_cls: MagicMock):
 @patch("csob_ceb_bc.__main__.BusinessConnectorClient")
 def test_cli_upload(mock_client_cls: MagicMock):
     mock_client = MagicMock()
-    mock_client.upload_payment_batch.return_value = None
+    mock_client.upload_payment_batch = AsyncMock(return_value=None)
     mock_client_cls.from_config.return_value = mock_client
 
     result = main(
@@ -74,7 +77,7 @@ def test_cli_upload_with_result(mock_client_cls: MagicMock):
     result_mock = MagicMock()
     result_mock.status.value = "I"
     result_mock.ticket_id = "T-123"
-    mock_client.upload_payment_batch.return_value = result_mock
+    mock_client.upload_payment_batch = AsyncMock(return_value=result_mock)
     mock_client_cls.from_config.return_value = mock_client
 
     result = main(
@@ -98,7 +101,10 @@ def test_cli_upload_with_result(mock_client_cls: MagicMock):
 @patch("csob_ceb_bc.__main__.BusinessConnectorClient")
 def test_cli_download_with_environment(mock_client_cls: MagicMock):
     mock_client = MagicMock()
-    mock_client.download_new_files.return_value = []
+    batch_mock = MagicMock()
+    batch_mock.downloaded = []
+    batch_mock.pending = []
+    mock_client.download_new_files = AsyncMock(return_value=batch_mock)
     mock_client_cls.from_config.return_value = mock_client
 
     result = main(
@@ -124,7 +130,7 @@ def test_cli_download_with_environment(mock_client_cls: MagicMock):
 @patch("csob_ceb_bc.__main__.BusinessConnectorClient")
 def test_cli_upload_with_state_url(mock_client_cls: MagicMock):
     mock_client = MagicMock()
-    mock_client.upload_payment_batch.return_value = None
+    mock_client.upload_payment_batch = AsyncMock(return_value=None)
     mock_client_cls.from_config.return_value = mock_client
 
     result = main(
@@ -171,7 +177,7 @@ def test_cli_download_error(mock_client_cls: MagicMock):
 @patch("csob_ceb_bc.__main__.BusinessConnectorClient")
 def test_cli_upload_error(mock_client_cls: MagicMock):
     mock_client = MagicMock()
-    mock_client.upload_payment_batch.side_effect = CsobBCError("upload failed")
+    mock_client.upload_payment_batch = AsyncMock(side_effect=CsobBCError("upload failed"))
     mock_client_cls.from_config.return_value = mock_client
     with pytest.raises(CsobBCError):
         main(
@@ -194,7 +200,10 @@ def test_cli_upload_error(mock_client_cls: MagicMock):
 @patch("csob_ceb_bc.__main__.BusinessConnectorClient")
 def test_cli_download_with_pfx(mock_client_cls: MagicMock):
     mock_client = MagicMock()
-    mock_client.download_new_files.return_value = []
+    batch_mock = MagicMock()
+    batch_mock.downloaded = []
+    batch_mock.pending = []
+    mock_client.download_new_files = AsyncMock(return_value=batch_mock)
     mock_client_cls.from_config.return_value = mock_client
 
     result = main(
@@ -219,7 +228,7 @@ def test_cli_download_with_pfx(mock_client_cls: MagicMock):
 @patch("csob_ceb_bc.__main__.BusinessConnectorClient")
 def test_cli_upload_with_pfx(mock_client_cls: MagicMock):
     mock_client = MagicMock()
-    mock_client.upload_payment_batch.return_value = None
+    mock_client.upload_payment_batch = AsyncMock(return_value=None)
     mock_client_cls.from_config.return_value = mock_client
 
     result = main(
@@ -257,7 +266,7 @@ def test_cli_missing_cert_args():
 @patch("csob_ceb_bc.__main__.BusinessConnectorClient")
 def test_cli_upload_with_separator_and_skip_duplicates(mock_client_cls: MagicMock):
     mock_client = MagicMock()
-    mock_client.upload_payment_batch.return_value = None
+    mock_client.upload_payment_batch = AsyncMock(return_value=None)
     mock_client_cls.from_config.return_value = mock_client
 
     result = main(

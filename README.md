@@ -15,47 +15,49 @@ Production-ready Python SDK for automated file download and upload via ČSOB CEB
 ## Installation
 
 ```bash
-pip install csob-ceb-business-connector-sdk
+pip install "csob-ceb-business-connector-sdk[async]"
 ```
 
 ## Quickstart
 
 ```python
+import asyncio
 from pathlib import Path
 from csob_ceb_bc import BusinessConnectorClient, ConnectorConfig, CertificateConfig, Environment
-from csob_ceb_bc.models import DownloadFilter
+from csob_ceb_bc.models import DownloadFilter, UploadFile, UploadMode
 
-client = BusinessConnectorClient.from_config(
-    ConnectorConfig(
-        environment=Environment.PRODUCTION,
-        contract_number="YOUR_CONTRACT",
-        client_app_guid="your-guid",
-        certificate=CertificateConfig(
-            cert_file=Path("/secure/cert.crt"),
-            key_file=Path("/secure/key.key"),
-        ),
-        state_url="sqlite:////var/lib/csob-ceb/state.db",
+async def main():
+    client = BusinessConnectorClient.from_config(
+        ConnectorConfig(
+            environment=Environment.PRODUCTION,
+            contract_number="YOUR_CONTRACT",
+            client_app_guid="your-guid",
+            certificate=CertificateConfig(
+                cert_file=Path("/secure/cert.crt"),
+                key_file=Path("/secure/key.key"),
+            ),
+            state_url="sqlite:////var/lib/csob-ceb/state.db",
+        )
     )
-)
 
-# Download new files
-files = client.download_new_files(
-    filter=DownloadFilter(file_types=["VYPIS", "AVIZO"]),
-    target_dir=Path("./inbox"),
-)
+    files = await client.download_new_files(
+        filter=DownloadFilter(file_types=["VYPIS", "AVIZO"]),
+        target_dir=Path("./inbox"),
+    )
 
-# Upload payment batch
-from csob_ceb_bc.models import UploadFile, UploadMode
-result = client.upload_payment_batch(
-    file=Path("payments.xml"),
-    metadata=UploadFile(filename="payments.xml", format="XML SEPA", mode=UploadMode.AllOrNothing),
-)
+    result = await client.upload_payment_batch(
+        file=Path("payments.xml"),
+        metadata=UploadFile(
+            filename="payments.xml",
+            format="XML SEPA",
+            mode=UploadMode.AllOrNothing,
+        ),
+    )
 
-# Poll for import protocols
-client.poll_import_protocols()
+    await client.poll_import_protocols()
+    await client.resume_pending()
 
-# Resume after crash
-client.resume_pending()
+asyncio.run(main())
 ```
 
 ## Configuration

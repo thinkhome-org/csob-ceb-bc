@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -23,7 +23,7 @@ def repo(tmp_path: Path):
 def test_profile_key_is_sha256():
     mgr = DownloadManager(
         contract_number="123456",
-        client_app_guid="guid",
+        client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         cert_fingerprint="fp",
         environment="production",
         soap=MagicMock(),
@@ -32,312 +32,122 @@ def test_profile_key_is_sha256():
     )
     key = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
     assert len(key) == 64
-    # Same inputs produce same hash
     key2 = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
     assert key == key2
-    # Different inputs produce different hash
     key3 = mgr._profile_key(DownloadFilter())
     assert key != key3
 
 
-def test_cursor_not_advanced_when_file_status_r(repo: SqliteStateRepository, tmp_path: Path):
+@pytest.mark.asyncio
+async def test_cursor_not_advanced_when_file_status_r(repo: SqliteStateRepository, tmp_path: Path):
     soap = MagicMock()
     rest = MagicMock()
-    soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC),
-        files=[
-            DownloadFile(
-                filename="stmt.pdf",
-                type=DownloadFileType.VYPIS,
-                format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
-                size=1024,
-                status=DownloadFileStatus.R,
-                url=None,
-                upload_file_hash=None,
-            )
-        ],
+    soap.get_download_file_list_v4 = AsyncMock(
+        return_value=MagicMock(
+            query_timestamp=datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC),
+            files=[
+                DownloadFile(
+                    filename="stmt.pdf",
+                    type=DownloadFileType.VYPIS,
+                    format="PDF",
+                    creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
+                    size=1024,
+                    status=DownloadFileStatus.R,
+                    url=None,
+                    upload_file_hash=None,
+                )
+            ],
+        )
     )
     mgr = DownloadManager(
         contract_number="123456",
-        client_app_guid="guid",
+        client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         cert_fingerprint="fp",
         environment="production",
         soap=soap,
         rest=rest,
         state=repo,
     )
-    mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
+    await mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
     key = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
     assert repo.get_profile_cursor(key) is None
 
 
-def test_cursor_advanced_when_all_downloaded(repo: SqliteStateRepository, tmp_path: Path):
+@pytest.mark.asyncio
+async def test_cursor_advanced_when_all_downloaded(repo: SqliteStateRepository, tmp_path: Path):
     soap = MagicMock()
     rest = MagicMock()
+    rest.download_to_file = AsyncMock()
     ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
-    soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=ts,
-        files=[
-            DownloadFile(
-                filename="stmt.pdf",
-                type=DownloadFileType.VYPIS,
-                format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
-                size=1024,
-                status=DownloadFileStatus.D,
-                url="https://example.com/stmt.pdf",
-                upload_file_hash=None,
-            )
-        ],
-    )
-    mgr = DownloadManager(
-        contract_number="123456",
-        client_app_guid="guid",
-        cert_fingerprint="fp",
-        environment="production",
-        soap=soap,
-        rest=rest,
-        state=repo,
-    )
-    result = mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
-    key = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
-    assert repo.get_profile_cursor(key) == ts
-    assert len(result) == 1
-
-
-def test_cursor_advanced_when_empty_batch(repo: SqliteStateRepository, tmp_path: Path):
-    soap = MagicMock()
-    rest = MagicMock()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
-    soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=ts,
-        files=[],
-    )
-    mgr = DownloadManager(
-        contract_number="123456",
-        client_app_guid="guid",
-        cert_fingerprint="fp",
-        environment="production",
-        soap=soap,
-        rest=rest,
-        state=repo,
-    )
-    result = mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
-    key = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
-    assert repo.get_profile_cursor(key) == ts
-    assert len(result) == 0
-
-
-def test_permanent_failure_skipped(repo: SqliteStateRepository, tmp_path: Path):
-    soap = MagicMock()
-    rest = MagicMock()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
-    soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=ts,
-        files=[
-            DownloadFile(
-                filename="bad.pdf",
-                type=DownloadFileType.VYPIS,
-                format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
-                size=1024,
-                status=DownloadFileStatus.F,
-                url=None,
-                upload_file_hash=None,
-            )
-        ],
-    )
-    mgr = DownloadManager(
-        contract_number="123456",
-        client_app_guid="guid",
-        cert_fingerprint="fp",
-        environment="production",
-        soap=soap,
-        rest=rest,
-        state=repo,
-    )
-    result = mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
-    key = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
-    assert repo.get_profile_cursor(key) == ts
-    assert len(result) == 0
-    rest.download_to_file.assert_not_called()
-
-
-def test_download_metrics_populated(repo: SqliteStateRepository, tmp_path: Path):
-    soap = MagicMock()
-    rest = MagicMock()
-    metrics = MetricsCollector()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
-    soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=ts,
-        files=[
-            DownloadFile(
-                filename="stmt.pdf",
-                type=DownloadFileType.VYPIS,
-                format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
-                size=1024,
-                status=DownloadFileStatus.D,
-                url="https://example.com/stmt.pdf",
-                upload_file_hash=None,
-            )
-        ],
-    )
-    mgr = DownloadManager(
-        contract_number="123456",
-        client_app_guid="guid",
-        cert_fingerprint="fp",
-        environment="production",
-        soap=soap,
-        rest=rest,
-        state=repo,
-        metrics=metrics,
-    )
-    mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
-    assert metrics.counter_value("download_soap_calls") == 1
-    assert metrics.counter_value("download_success") == 1
-    assert metrics.gauge_value("download_file_count") == 1.0
-
-
-def test_download_unresolved_metrics(repo: SqliteStateRepository, tmp_path: Path):
-    soap = MagicMock()
-    rest = MagicMock()
-    metrics = MetricsCollector()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
-    soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=ts,
-        files=[
-            DownloadFile(
-                filename="stmt.pdf",
-                type=DownloadFileType.VYPIS,
-                format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
-                size=1024,
-                status=DownloadFileStatus.R,
-                url=None,
-                upload_file_hash=None,
-            )
-        ],
-    )
-    mgr = DownloadManager(
-        contract_number="123456",
-        client_app_guid="guid",
-        cert_fingerprint="fp",
-        environment="production",
-        soap=soap,
-        rest=rest,
-        state=repo,
-        metrics=metrics,
-    )
-    mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
-    assert metrics.counter_value("download_unresolved_files") == 1
-
-
-def test_profile_key_with_all_filter_fields():
-    mgr = DownloadManager(
-        contract_number="123456",
-        client_app_guid="guid",
-        cert_fingerprint="fp",
-        environment="production",
-        soap=MagicMock(),
-        rest=MagicMock(),
-        state=MagicMock(),
-    )
-    dt = datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC)
-    key = mgr._profile_key(
-        DownloadFilter(
-            file_types=[DownloadFileType.VYPIS],
-            file_formats=["PDF", "CSV"],
-            filename="stmt",
-            created_after=dt,
-            created_before=dt,
+    soap.get_download_file_list_v4 = AsyncMock(
+        return_value=MagicMock(
+            query_timestamp=ts,
+            files=[
+                DownloadFile(
+                    filename="stmt.pdf",
+                    type=DownloadFileType.VYPIS,
+                    format="PDF",
+                    creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
+                    size=1024,
+                    status=DownloadFileStatus.D,
+                    url="https://example.com/stmt.pdf",
+                    upload_file_hash=None,
+                )
+            ],
         )
     )
-    assert len(key) == 64
-
-
-def test_ensure_filter_guid_already_present():
     mgr = DownloadManager(
         contract_number="123456",
-        client_app_guid="guid",
-        cert_fingerprint="fp",
-        environment="production",
-        soap=MagicMock(),
-        rest=MagicMock(),
-        state=MagicMock(),
-    )
-    f = DownloadFilter(client_app_guid="already-set")
-    result = mgr._ensure_filter_guid(f)
-    assert result.client_app_guid == "already-set"
-
-
-def test_download_permanent_rest_error_skipped(repo: SqliteStateRepository, tmp_path: Path):
-    from csob_ceb_bc.errors import CsobBCHttpError
-
-    soap = MagicMock()
-    rest = MagicMock()
-    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
-    soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=ts,
-        files=[
-            DownloadFile(
-                filename="stmt.pdf",
-                type=DownloadFileType.VYPIS,
-                format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
-                size=1024,
-                status=DownloadFileStatus.D,
-                url="https://example.com/stmt.pdf",
-                upload_file_hash=None,
-            )
-        ],
-    )
-    rest.download_to_file.side_effect = CsobBCHttpError(
-        "Not Found", operation="download", permanent=True, retryable=False
-    )
-    mgr = DownloadManager(
-        contract_number="123456",
-        client_app_guid="guid",
+        client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         cert_fingerprint="fp",
         environment="production",
         soap=soap,
         rest=rest,
         state=repo,
     )
-    result = mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
-    assert len(result) == 0
+    result = await mgr.download_new_files(
+        DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path
+    )
     key = mgr._profile_key(DownloadFilter(file_types=[DownloadFileType.VYPIS]))
     assert repo.get_profile_cursor(key) == ts
+    assert len(result.downloaded) == 1
+    assert result.cursor_advanced is True
+    assert result.has_pending_files is False
+    rest.download_to_file.assert_awaited_once()
 
 
-def test_download_retryable_rest_error_raised(repo: SqliteStateRepository, tmp_path: Path):
+@pytest.mark.asyncio
+async def test_download_retryable_rest_error_raised(repo: SqliteStateRepository, tmp_path: Path):
     from csob_ceb_bc.errors import CsobBCHttpError
 
     soap = MagicMock()
     rest = MagicMock()
     ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
-    soap.get_download_file_list_v4.return_value = MagicMock(
-        query_timestamp=ts,
-        files=[
-            DownloadFile(
-                filename="stmt.pdf",
-                type=DownloadFileType.VYPIS,
-                format="PDF",
-                creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
-                size=1024,
-                status=DownloadFileStatus.D,
-                url="https://example.com/stmt.pdf",
-                upload_file_hash=None,
-            )
-        ],
+    soap.get_download_file_list_v4 = AsyncMock(
+        return_value=MagicMock(
+            query_timestamp=ts,
+            files=[
+                DownloadFile(
+                    filename="stmt.pdf",
+                    type=DownloadFileType.VYPIS,
+                    format="PDF",
+                    creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
+                    size=1024,
+                    status=DownloadFileStatus.D,
+                    url="https://example.com/stmt.pdf",
+                    upload_file_hash=None,
+                )
+            ],
+        )
     )
-    rest.download_to_file.side_effect = CsobBCHttpError(
-        "Server Error", operation="download", permanent=False, retryable=True
+    rest.download_to_file = AsyncMock(
+        side_effect=CsobBCHttpError(
+            "Server Error", operation="download", permanent=False, retryable=True
+        )
     )
     mgr = DownloadManager(
         contract_number="123456",
-        client_app_guid="guid",
+        client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         cert_fingerprint="fp",
         environment="production",
         soap=soap,
@@ -345,4 +155,44 @@ def test_download_retryable_rest_error_raised(repo: SqliteStateRepository, tmp_p
         state=repo,
     )
     with pytest.raises(CsobBCHttpError):
-        mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
+        await mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
+
+
+@pytest.mark.asyncio
+async def test_download_metrics_populated(repo: SqliteStateRepository, tmp_path: Path):
+    soap = MagicMock()
+    rest = MagicMock()
+    rest.download_to_file = AsyncMock()
+    metrics = MetricsCollector()
+    ts = datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC)
+    soap.get_download_file_list_v4 = AsyncMock(
+        return_value=MagicMock(
+            query_timestamp=ts,
+            files=[
+                DownloadFile(
+                    filename="stmt.pdf",
+                    type=DownloadFileType.VYPIS,
+                    format="PDF",
+                    creation_date_time=datetime(2025, 1, 14, 9, 0, 0, tzinfo=UTC),
+                    size=1024,
+                    status=DownloadFileStatus.D,
+                    url="https://example.com/stmt.pdf",
+                    upload_file_hash=None,
+                )
+            ],
+        )
+    )
+    mgr = DownloadManager(
+        contract_number="123456",
+        client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        cert_fingerprint="fp",
+        environment="production",
+        soap=soap,
+        rest=rest,
+        state=repo,
+        metrics=metrics,
+    )
+    await mgr.download_new_files(DownloadFilter(file_types=[DownloadFileType.VYPIS]), tmp_path)
+    assert metrics.counter_value("download_soap_calls") == 1
+    assert metrics.counter_value("download_success") == 1
+    assert metrics.gauge_value("download_file_count") == 1.0

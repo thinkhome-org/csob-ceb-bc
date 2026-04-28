@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
+from collections.abc import Callable, Coroutine
 from pathlib import Path
+from typing import Any, cast
 
 from csob_ceb_bc import BusinessConnectorClient, CertificateConfig, ConnectorConfig, Environment
 from csob_ceb_bc.models import DownloadFilter
@@ -22,7 +25,7 @@ def _certificate_config(args: argparse.Namespace) -> CertificateConfig:
     )
 
 
-def cmd_download(args: argparse.Namespace) -> int:
+async def cmd_download(args: argparse.Namespace) -> int:
     client = BusinessConnectorClient.from_config(
         ConnectorConfig(
             environment=Environment(args.environment),
@@ -32,15 +35,15 @@ def cmd_download(args: argparse.Namespace) -> int:
             state_url=args.state_url,
         )
     )
-    files = client.download_new_files(
+    result = await client.download_new_files(
         filter=DownloadFilter(file_types=args.types.split(",")),
         target_dir=Path(args.target),
     )
-    print(f"Downloaded {len(files)} files")
+    print(f"Downloaded {len(result.downloaded)} files, pending {len(result.pending)} files")
     return 0
 
 
-def cmd_upload(args: argparse.Namespace) -> int:
+async def cmd_upload(args: argparse.Namespace) -> int:
     from csob_ceb_bc.models import UploadFile, UploadMode
 
     client = BusinessConnectorClient.from_config(
@@ -61,7 +64,7 @@ def cmd_upload(args: argparse.Namespace) -> int:
         upload_kwargs["separator"] = args.separator
     if args.skip_check_duplicates:
         upload_kwargs["skip_check_duplicates"] = True
-    result = client.upload_payment_batch(
+    result = await client.upload_payment_batch(
         file=Path(args.file),
         metadata=UploadFile(**upload_kwargs),
     )
@@ -112,7 +115,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args.pfx and not (args.cert and args.key):
         print("Error: either --pfx or both --cert and --key are required", file=sys.stderr)
         return 1
-    return args.func(args)  # type: ignore[no-any-return]
+    command = cast(Callable[[argparse.Namespace], Coroutine[Any, Any, int]], args.func)
+    return asyncio.run(command(args))
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -42,11 +42,13 @@ def test_create_upload_attempt(repo: SqliteStateRepository):
         size=1024,
         file_format="XML SEPA",
         mode="AllOrNothing",
+        local_path="/tmp/pay.xml",
     )
     row = repo.get_upload_attempt("a1")
     assert row is not None
     assert row["filename"] == "pay.xml"
     assert row["status"] == "started"
+    assert row["local_path"] == "/tmp/pay.xml"
 
 
 def test_get_upload_attempt_missing(repo: SqliteStateRepository):
@@ -86,6 +88,6 @@ def test_create_import_protocol(repo: SqliteStateRepository):
         new_file_id="NFID-1",
         upload_hash="abc",
         filename="prot.xml",
-        client_app_guid="guid",
+        client_app_guid="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     )
     # Just verify it doesn't raise; no getter currently exposed

@@ -59,13 +59,14 @@ class SqliteStateRepository(StateRepository):
         size: int,
         file_format: str,
         mode: str,
+        local_path: str | None = None,
     ) -> None:
         with self._connect() as conn:
             conn.execute(
                 """INSERT INTO upload_attempts
-                   (attempt_id, filename, file_hash, size, file_format, mode, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (attempt_id, filename, file_hash, size, file_format, mode, "started"),
+                   (attempt_id, filename, file_hash, size, file_format, mode, status, local_path)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (attempt_id, filename, file_hash, size, file_format, mode, "started", local_path),
             )
 
     def get_upload_attempt(self, attempt_id: str) -> dict[str, Any] | None:
@@ -163,7 +164,7 @@ class SqliteStateRepository(StateRepository):
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT a.attempt_id, a.filename, a.file_hash,
-                           a.file_format, a.mode, a.start_url, r.new_file_id
+                           a.file_format, a.mode, a.start_url, a.local_path, r.new_file_id
                     FROM upload_attempts a
                     LEFT JOIN upload_rest_results r ON a.attempt_id = r.attempt_id
                     LEFT JOIN upload_finish_results f ON a.attempt_id = f.attempt_id
