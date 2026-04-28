@@ -212,14 +212,13 @@ class SoapGateway:
                 "Format": f.format,
                 "Separator": f.separator,
                 "Mode": f.mode.value,
-                "SkipCheckDuplicates": f.skip_check_duplicates,
             }
             for f in files
         ]
         request = {
             "ContractNumber": self._config.contract_number,
             "ClientAppGuid": self._config.client_app_guid,
-            "Files": {"File": request_files},
+            "FileList": {"ImportFileDetail": request_files},
         }
 
         try:
@@ -256,7 +255,7 @@ class SoapGateway:
         request = {
             "ContractNumber": self._config.contract_number,
             "ClientAppGuid": self._config.client_app_guid,
-            "Files": {"File": request_files},
+            "FileList": {"FileId": request_files},
         }
 
         try:

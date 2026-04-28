@@ -86,22 +86,29 @@ def test_upload_file_signed_mode_no_skip_duplicates_promise():
         )
 
 
-def test_upload_file_hash_must_be_64_hex():
+def test_upload_file_hash_must_be_hex():
     with pytest.raises(ValueError):
         UploadFile(filename="test.xml", format="XML SEPA", mode=UploadMode.AllOrNothing, hash="bad")
-    valid = UploadFile(
+    valid_sha = UploadFile(
         filename="test.xml",
         format="XML SEPA",
         mode=UploadMode.AllOrNothing,
         hash="a" * 64,
     )
-    assert valid.hash == "a" * 64
+    assert valid_sha.hash == "a" * 64
+    valid_md5 = UploadFile(
+        filename="test.xml",
+        format="XML SEPA",
+        mode=UploadMode.AllOrNothing,
+        hash="a" * 32,
+    )
+    assert valid_md5.hash == "a" * 32
     # Direct calls for coverage
-    assert UploadFile._hash_must_be_sha256(None) is None
+    assert UploadFile._hash_must_be_hex(None) is None
     with pytest.raises(ValueError):
-        UploadFile._hash_must_be_sha256("gg")
+        UploadFile._hash_must_be_hex("gg")
     with pytest.raises(ValueError):
-        UploadFile._hash_must_be_sha256("g" * 64)
+        UploadFile._hash_must_be_hex("g" * 64)
 
 
 def test_download_file_model():

@@ -102,11 +102,11 @@ class UploadFile(BaseModel):
 
     @field_validator("hash")
     @classmethod
-    def _hash_must_be_sha256(cls, v: str | None) -> str | None:
+    def _hash_must_be_hex(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        if len(v) != 64:
-            raise ValueError("hash must be 64 hex characters (SHA256)")
+        if len(v) not in (32, 64):
+            raise ValueError("hash must be 32 hex characters (MD5) or 64 hex characters (SHA256)")
         try:
             int(v, 16)
         except ValueError as exc:

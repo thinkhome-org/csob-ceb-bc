@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
 
 from csob_ceb_bc.config import CertificateConfig
 from csob_ceb_bc.errors import CsobBCCertificateError
@@ -34,6 +35,27 @@ class CertificateStore:
             raise CsobBCCertificateError(f"Certificate not found: {self.cert_path}")
         if not self.key_path.exists():
             raise CsobBCCertificateError(f"Private key not found: {self.key_path}")
+
+    @property
+    def _cert(self) -> x509.Certificate:
+        return x509.load_pem_x509_certificate(
+            self.cert_path.read_bytes(), default_backend()
+        )
+
+    @property
+    def fingerprint(self) -> str:
+        return self._cert.fingerprint(hashes.SHA256()).hex()
+
+    @property
+    def subject(self) -> str:
+        return str(self._cert.subject)
+
+    @property
+    def not_after(self) -> datetime:
+        na = self._cert.not_valid_after_utc
+        if na is None:
+            raise CsobBCCertificateError("Certificate has no expiry date")
+        return na
 
     def _extract_pfx(self) -> None:
         import os
