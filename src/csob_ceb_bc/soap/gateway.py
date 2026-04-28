@@ -161,7 +161,7 @@ class SoapGateway:
                 request["Filter"] = filter_dict
 
         try:
-            response = self._client.service.GetDownloadFileList_v2(**request)
+            response = self._client.service.GetDownloadFileList_v4(**request)
         except Fault as fault:
             self._handle_soap_fault(fault)
 

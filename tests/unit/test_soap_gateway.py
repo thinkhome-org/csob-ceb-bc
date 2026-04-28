@@ -46,7 +46,7 @@ def _config_with_ca() -> ConnectorConfig:
 def test_get_download_file_list_v4(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.GetDownloadFileList_v2.return_value = {
+    mock_client.service.GetDownloadFileList_v4.return_value = {
         "QueryTimestamp": "2025-01-15T10:00:00+01:00",
         "FileList": {
             "FileDetail": [
@@ -79,7 +79,7 @@ def test_get_download_file_list_v4(mock_client_cls: MagicMock):
 def test_get_download_file_list_v4_missing_timestamp(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.GetDownloadFileList_v2.return_value = {
+    mock_client.service.GetDownloadFileList_v4.return_value = {
         "FileList": None,
     }
 
@@ -93,7 +93,7 @@ def test_get_download_file_list_v4_missing_timestamp(mock_client_cls: MagicMock)
 def test_soap_fault_mapped(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.GetDownloadFileList_v2.side_effect = Fault(
+    mock_client.service.GetDownloadFileList_v4.side_effect = Fault(
         "Rate limit",
         detail={"TicketId": "T-123", "FaultCode": "1101"},
     )
@@ -271,7 +271,7 @@ def test_setup_transport_with_ca_bundle(mock_client_cls: MagicMock):
 def test_get_download_file_list_v4_full_filter(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.GetDownloadFileList_v2.return_value = {
+    mock_client.service.GetDownloadFileList_v4.return_value = {
         "QueryTimestamp": "2025-01-15T10:00:00+01:00",
         "TicketId": "T-FULL",
         "FileList": None,
@@ -290,7 +290,7 @@ def test_get_download_file_list_v4_full_filter(mock_client_cls: MagicMock):
             client_app_guid="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
         ),
     )
-    call_args = mock_client.service.GetDownloadFileList_v2.call_args[1]
+    call_args = mock_client.service.GetDownloadFileList_v4.call_args[1]
     assert call_args["Filter"]["FileTypes"] == {"FileType": ["VYPIS"]}
     assert call_args["Filter"]["FileFormats"] == {"FileFormat": ["PDF", "CSV"]}
     assert call_args["Filter"]["FileName"] == "stmt"
@@ -318,7 +318,7 @@ def test_setup_transport_with_cert_store(mock_client_cls: MagicMock):
 def test_get_download_file_list_v4_single_file_detail(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.GetDownloadFileList_v2.return_value = {
+    mock_client.service.GetDownloadFileList_v4.return_value = {
         "QueryTimestamp": "2025-01-15T10:00:00+01:00",
         "FileList": {
             "FileDetail": {
@@ -345,7 +345,7 @@ def test_get_download_file_list_v4_unparseable_creation_date(mock_client_cls: Ma
 
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.GetDownloadFileList_v2.return_value = {
+    mock_client.service.GetDownloadFileList_v4.return_value = {
         "QueryTimestamp": "2025-01-15T10:00:00+01:00",
         "FileList": {
             "FileDetail": {
