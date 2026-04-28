@@ -171,19 +171,19 @@ print()
 # ---------------------------------------------------------------------------
 # 8. Upload SOAP handshake (read-only check)
 # ---------------------------------------------------------------------------
-print("[8/8] Upload SOAP handshake (StartUploadFileList_v1)...")
+print("[8/8] Upload SOAP handshake (StartUploadFileList_v3)...")
 try:
     dummy_file = UploadFile(
         filename="TEST_DO_NOT_PROCESS.xml",
         format="XML SEPA",
         mode=UploadMode.AllOrNothing,
-        hash="a" * 32,
+        hash="a" * 64,
         size=1024,
     )
     # We only call start_upload to verify the SOAP operation is reachable.
     # We do NOT actually upload the file or call finish_upload.
     result = soap.start_upload_file_list_v3(files=[dummy_file])
-    print(f"  ✅ StartUploadFileList_v1 responded")
+    print(f"  ✅ StartUploadFileList_v3 responded")
     for r in result:
         print(f"      - {r.filename}: status={r.status}, url={'present' if r.url else 'none'}")
 except Exception as exc:

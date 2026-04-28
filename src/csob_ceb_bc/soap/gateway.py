@@ -212,6 +212,7 @@ class SoapGateway:
                 "Format": f.format,
                 "Separator": f.separator,
                 "Mode": f.mode.value,
+                "SkipCheckDuplicates": f.skip_check_duplicates,
             }
             for f in files
         ]
@@ -222,7 +223,7 @@ class SoapGateway:
         }
 
         try:
-            response = self._client.service.StartUploadFileList_v1(**request)
+            response = self._client.service.StartUploadFileList_v3(**request)
         except Fault as fault:
             self._handle_soap_fault(fault)
 
@@ -259,7 +260,7 @@ class SoapGateway:
         }
 
         try:
-            response = self._client.service.FinishUploadFileList_v1(**request)
+            response = self._client.service.FinishUploadFileList_v2(**request)
         except Fault as fault:
             self._handle_soap_fault(fault)
 

@@ -108,7 +108,7 @@ def test_soap_fault_mapped(mock_client_cls: MagicMock):
 def test_start_upload_file_list_v3(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.StartUploadFileList_v1.return_value = {
+    mock_client.service.StartUploadFileList_v3.return_value = {
         "FileStatus": [
             {
                 "Filename": "pay.xml",
@@ -142,7 +142,7 @@ def test_start_upload_file_list_v3(mock_client_cls: MagicMock):
 def test_start_upload_single_status_not_list(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.StartUploadFileList_v1.return_value = {
+    mock_client.service.StartUploadFileList_v3.return_value = {
         "FileStatus": {
             "Filename": "pay.xml",
             "Status": "R",
@@ -170,7 +170,7 @@ def test_start_upload_single_status_not_list(mock_client_cls: MagicMock):
 def test_start_upload_fault(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.StartUploadFileList_v1.side_effect = Fault(
+    mock_client.service.StartUploadFileList_v3.side_effect = Fault(
         "Blocked",
         detail={"TicketId": "T-999", "FaultCode": "1012"},
     )
@@ -185,7 +185,7 @@ def test_start_upload_fault(mock_client_cls: MagicMock):
 def test_finish_upload_file_list_v2(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.FinishUploadFileList_v1.return_value = {
+    mock_client.service.FinishUploadFileList_v2.return_value = {
         "FileList": {
             "FileStatus": [
                 {
@@ -210,7 +210,7 @@ def test_finish_upload_file_list_v2(mock_client_cls: MagicMock):
 def test_finish_upload_single_status_not_list(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.FinishUploadFileList_v1.return_value = {
+    mock_client.service.FinishUploadFileList_v2.return_value = {
         "FileList": {
             "FileStatus": {
                 "Filename": "pay.xml",
@@ -231,7 +231,7 @@ def test_finish_upload_single_status_not_list(mock_client_cls: MagicMock):
 def test_finish_upload_fault(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.FinishUploadFileList_v1.side_effect = Fault(
+    mock_client.service.FinishUploadFileList_v2.side_effect = Fault(
         "Error",
         detail={"TicketId": "T-102", "FaultCode": "1000"},
     )
