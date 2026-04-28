@@ -37,7 +37,7 @@ def test_rate_limiter_blocks_when_empty(mock_client_cls: MagicMock):
 def test_rate_limiter_allows_when_available(mock_client_cls: MagicMock):
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.service.GetDownloadFileList.return_value = {
+    mock_client.service.GetDownloadFileList_v2.return_value = {
         "QueryTimestamp": "2025-01-15T10:00:00+01:00",
         "FileList": None,
     }

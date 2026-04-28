@@ -47,10 +47,10 @@ class SoapGateway:
         self._config = config
         self._endpoint = self.DEMO_URL if config.environment == Environment.DEMO else self.PROD_URL
         self._wsdl_path = wsdl_path or self._endpoint + "?wsdl"
-        self._client = zeep.Client(self._wsdl_path)  # type: ignore[no-untyped-call]
         self._rate_limiter = rate_limiter
         self._cert_store = cert_store
-        self._setup_transport()
+        self._transport = self._create_transport()
+        self._client = zeep.Client(self._wsdl_path, transport=self._transport)  # type: ignore[no-untyped-call]
 
     def _check_rate_limit(self) -> None:
         if self._rate_limiter is not None and not self._rate_limiter.acquire():
@@ -60,7 +60,7 @@ class SoapGateway:
                 safe_message="Rate limit exceeded",
             )
 
-    def _setup_transport(self) -> None:
+    def _create_transport(self) -> zeep.Transport:
         # zeep uses requests under the hood; configure mTLS via transport session
         import requests
         from requests.adapters import HTTPAdapter
@@ -78,15 +78,35 @@ class SoapGateway:
 
         adapter = HTTPAdapter()
         session.mount("https://", adapter)
-        self._client.transport.session = session
+        return zeep.Transport(session=session)  # type: ignore[no-untyped-call]
+
+    @staticmethod
+    def _get_value(obj: Any, key: str, default: Any = None) -> Any:
+        """Extract value from dict or zeep object."""
+        if obj is None:
+            return default
+        if hasattr(obj, key):
+            return getattr(obj, key)
+        if hasattr(obj, "get"):
+            return obj.get(key, default)
+        return default
 
     def _extract_ticket_id(self, detail: Any) -> str | None:
         if isinstance(detail, dict):
-            return detail.get("TicketId") or detail.get("ticketId")
+            result: str | None = (
+                self._get_value(detail, "TicketId")
+                or self._get_value(detail, "ticketId")
+            )
+            return result
         return None
 
     def _parse_datetime(self, value: str | None) -> datetime | None:
         if not value:
+            return None
+        # zeep may already return a datetime object for xs:dateTime fields
+        if isinstance(value, datetime):
+            return value
+        if not isinstance(value, str):
             return None
         # Handle xsd:dateTime format; fallback to fromisoformat
         try:
@@ -99,9 +119,13 @@ class SoapGateway:
         fault_code = None
         fault_string = str(fault)
         if isinstance(fault.detail, dict):
-            fault_code = fault.detail.get("FaultCode") or fault.detail.get("faultcode")
+            fault_code = self._get_value(
+                fault.detail, "FaultCode"
+            ) or self._get_value(fault.detail, "faultcode")
             fault_string = (
-                fault.detail.get("FaultString") or fault.detail.get("faultstring") or fault_string
+                self._get_value(fault.detail, "FaultString")
+                or self._get_value(fault.detail, "faultstring")
+                or fault_string
             )
         raise map_soap_fault(
             fault_code=fault_code,
@@ -137,39 +161,39 @@ class SoapGateway:
                 request["Filter"] = filter_dict
 
         try:
-            response = self._client.service.GetDownloadFileList(**request)
+            response = self._client.service.GetDownloadFileList_v2(**request)
         except Fault as fault:
             self._handle_soap_fault(fault)
 
-        qt = self._parse_datetime(response.get("QueryTimestamp"))
+        qt = self._parse_datetime(self._get_value(response, "QueryTimestamp"))
         if qt is None:
             qt = datetime.now(UTC)
 
         files: list[DownloadFile] = []
-        file_list = response.get("FileList")
+        file_list = self._get_value(response, "FileList")
         if file_list:
-            file_details = file_list.get("FileDetail")
+            file_details = self._get_value(file_list, "FileDetail")
             if file_details is not None and not isinstance(file_details, list):
                 file_details = [file_details]
             for fd in file_details or []:
-                cdt = self._parse_datetime(fd.get("CreationDateTime"))
+                cdt = self._parse_datetime(self._get_value(fd, "CreationDateTime"))
                 if cdt is None:
                     raise CsobBCProtocolError(
                         f"GetDownloadFileList response has unparseable "
-                        f"CreationDateTime: {fd.get('CreationDateTime')!r}",
+                        f"CreationDateTime: {self._get_value(fd, 'CreationDateTime')!r}",
                         operation="GetDownloadFileList",
                     )
                 files.append(
                     DownloadFile(
-                        filename=fd.get("Filename", ""),
-                        type=DownloadFileType(fd.get("Type", "VYPIS")),
-                        format=fd.get("Format"),
+                        filename=self._get_value(fd, "Filename", ""),
+                        type=DownloadFileType(self._get_value(fd, "Type", "VYPIS")),
+                        format=self._get_value(fd, "Format"),
                         creation_date_time=cdt,
-                        size=fd.get("Size"),
-                        status=DownloadFileStatus(fd.get("Status", "R")),
-                        url=fd.get("Url"),
-                        upload_file_hash=fd.get("UploadFileHash"),
-                        ticket_id=fd.get("TicketId"),
+                        size=self._get_value(fd, "Size"),
+                        status=DownloadFileStatus(self._get_value(fd, "Status", "R")),
+                        url=self._get_value(fd, "Url"),
+                        upload_file_hash=self._get_value(fd, "UploadFileHash"),
+                        ticket_id=self._get_value(fd, "TicketId"),
                     )
                 )
 
@@ -199,25 +223,25 @@ class SoapGateway:
         }
 
         try:
-            response = self._client.service.StartUploadFileList(**request)
+            response = self._client.service.StartUploadFileList_v1(**request)
         except Fault as fault:
             self._handle_soap_fault(fault)
 
         results: list[UploadStartResult] = []
-        file_list = response.get("FileList", {})
-        statuses = file_list.get("FileUrl") if file_list else None
+        file_list = self._get_value(response, "FileList", {})
+        statuses = self._get_value(file_list, "FileUrl") if file_list else None
         if statuses is None:
-            statuses = response.get("FileStatus", [])
+            statuses = self._get_value(response, "FileStatus", [])
         if statuses is not None and not isinstance(statuses, list):
             statuses = [statuses]
         for fs in statuses or []:
             results.append(
                 UploadStartResult(
-                    filename=fs.get("Filename", ""),
-                    status=UploadStartStatus(fs.get("Status", "R")),
-                    hash=fs.get("Hash"),
-                    url=fs.get("Url"),
-                    ticket_id=fs.get("TicketId"),
+                    filename=self._get_value(fs, "Filename", ""),
+                    status=UploadStartStatus(self._get_value(fs, "Status", "R")),
+                    hash=self._get_value(fs, "Hash"),
+                    url=self._get_value(fs, "Url"),
+                    ticket_id=self._get_value(fs, "TicketId"),
                 )
             )
         return results
@@ -236,22 +260,22 @@ class SoapGateway:
         }
 
         try:
-            response = self._client.service.FinishUploadFileList(**request)
+            response = self._client.service.FinishUploadFileList_v1(**request)
         except Fault as fault:
             self._handle_soap_fault(fault)
 
         results: list[UploadFinishResult] = []
-        file_list = response.get("FileList", {})
-        statuses = file_list.get("FileStatus") if file_list else []
+        file_list = self._get_value(response, "FileList", {})
+        statuses = self._get_value(file_list, "FileStatus") if file_list else []
         if statuses is not None and not isinstance(statuses, list):
             statuses = [statuses]
         for fs in statuses or []:
             results.append(
                 UploadFinishResult(
-                    filename=fs.get("Filename", ""),
-                    hash=fs.get("Hash", ""),
-                    status=UploadFinishStatus(fs.get("Status", "R")),
-                    ticket_id=fs.get("TicketId"),
+                    filename=self._get_value(fs, "Filename", ""),
+                    hash=self._get_value(fs, "Hash", ""),
+                    status=UploadFinishStatus(self._get_value(fs, "Status", "R")),
+                    ticket_id=self._get_value(fs, "TicketId"),
                 )
             )
         return results
