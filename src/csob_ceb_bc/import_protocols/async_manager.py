@@ -44,8 +44,7 @@ class AsyncImportProtocolManager:
 
     def _profile_key(self) -> str:
         raw = (
-            f"{self._environment}:{self._contract_number}:"
-            f"{self._client_app_guid}:import_protocols"
+            f"{self._environment}:{self._contract_number}:{self._client_app_guid}:import_protocols"
         )
         return hashlib.sha256(raw.encode()).hexdigest()
 

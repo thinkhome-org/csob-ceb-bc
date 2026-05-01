@@ -92,8 +92,7 @@ class DownloadFilter(BaseModel):
             v,
         ):
             raise ValueError(
-                "client_app_guid must be a UUID in format "
-                "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                "client_app_guid must be a UUID in format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             )
         return v
 

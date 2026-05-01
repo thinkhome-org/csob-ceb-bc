@@ -38,9 +38,7 @@ class CertificateStore:
 
     @property
     def _cert(self) -> x509.Certificate:
-        return x509.load_pem_x509_certificate(
-            self.cert_path.read_bytes(), default_backend()
-        )
+        return x509.load_pem_x509_certificate(self.cert_path.read_bytes(), default_backend())
 
     @property
     def fingerprint(self) -> str:

@@ -187,27 +187,21 @@ def parse_quotes(content: str | bytes, encoding: str = "cp1250") -> QuotesFile:
     # Header (record 01) must be first
     header = _parse_header(lines[0])
     if header.record_type != "01":
-        raise ValueError(
-            f"Expected QUOTES header (01), got {header.record_type!r}"
-        )
+        raise ValueError(f"Expected QUOTES header (01), got {header.record_type!r}")
 
     # Metadata (record 02) must be second
     if len(lines) < 2:
         raise ValueError("QUOTES file missing metadata record (02)")
     metadata = _parse_metadata(lines[1])
     if metadata.record_type != "02":
-        raise ValueError(
-            f"Expected QUOTES metadata (02), got {metadata.record_type!r}"
-        )
+        raise ValueError(f"Expected QUOTES metadata (02), got {metadata.record_type!r}")
 
     # Remaining lines are rates (record 03)
     rates: list[QuotesRate] = []
     for line in lines[2:]:
         rate = _parse_rate(line)
         if rate.record_type != "03":
-            raise ValueError(
-                f"Expected QUOTES rate (03), got {rate.record_type!r}"
-            )
+            raise ValueError(f"Expected QUOTES rate (03), got {rate.record_type!r}")
         rates.append(rate)
 
     return QuotesFile(header=header, metadata=metadata, rates=rates)

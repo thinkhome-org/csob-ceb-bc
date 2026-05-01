@@ -99,9 +99,8 @@ class SoapGateway:
 
     def _extract_ticket_id(self, detail: Any) -> str | None:
         if isinstance(detail, dict):
-            result: str | None = (
-                self._get_value(detail, "TicketId")
-                or self._get_value(detail, "ticketId")
+            result: str | None = self._get_value(detail, "TicketId") or self._get_value(
+                detail, "ticketId"
             )
             return result
         return None
@@ -125,9 +124,9 @@ class SoapGateway:
         fault_code = None
         fault_string = str(fault)
         if isinstance(fault.detail, dict):
-            fault_code = self._get_value(
-                fault.detail, "FaultCode"
-            ) or self._get_value(fault.detail, "faultcode")
+            fault_code = self._get_value(fault.detail, "FaultCode") or self._get_value(
+                fault.detail, "faultcode"
+            )
             fault_string = (
                 self._get_value(fault.detail, "FaultString")
                 or self._get_value(fault.detail, "faultstring")
