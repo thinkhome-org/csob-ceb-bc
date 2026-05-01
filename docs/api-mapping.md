@@ -104,7 +104,7 @@ Tento dokument mapuje sekce oficiální příručky *ČSOB Business Connector �
 |----------|-----|
 | `https://ceb-bc.csob.cz/cebbc/api` | `SoapGateway.PROD_URL` |
 | `https://testceb-bc.csob.cz/cebbc/api` | `SoapGateway.DEMO_URL` |
-| Lokální WSDL | `wsdl/CEBBCWS.wsdl` (nahrazená `${BankAdress}` placeholder) |
+| Lokální WSDL | Bundled `csob_ceb_bc/wsdl/CEBBCWS.wsdl` (nahrazená `${BankAdress}` placeholder) |
 
 ---
 

@@ -47,7 +47,12 @@ class SoapGateway:
     ) -> None:
         self._config = config
         self._endpoint = self.DEMO_URL if config.environment == Environment.DEMO else self.PROD_URL
-        self._wsdl_path = wsdl_path or self._endpoint + "?wsdl"
+        if wsdl_path is not None:
+            self._wsdl_path = wsdl_path
+        else:
+            from importlib.resources import files
+
+            self._wsdl_path = str(files("csob_ceb_bc") / "wsdl" / "CEBBCWS.wsdl")
         self._rate_limiter = rate_limiter
         self._cert_store = cert_store
         self._transport = self._create_transport()

@@ -14,7 +14,7 @@ import zeep
 
 from csob_ceb_bc.models import DownloadFileFormat, DownloadFileType, DownloadFilter
 
-WSDL_PATH = Path(__file__).parent.parent.parent / "wsdl" / "CEBBCWS.wsdl"
+WSDL_PATH = Path(__file__).parent.parent.parent / "src" / "csob_ceb_bc" / "wsdl" / "CEBBCWS.wsdl"
 
 
 @pytest.fixture

@@ -6,7 +6,7 @@ Reads configuration from environment variables:
   CSOB_CLIENT_APP_GUID    Client app GUID (default: random UUID)
   CSOB_CERT_PEM           Path to certificate PEM (default: certs/bccert.pem)
   CSOB_CERT_KEY           Path to certificate key (default: certs/bccert.key)
-  CSOB_WSDL               Path to WSDL file (default: wsdl/CEBBCWS.wsdl)
+  CSOB_WSDL               Path to WSDL file (optional; bundled WSDL used by default)
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ CONTRACT_NUMBER = _require_env("CSOB_CONTRACT")
 CLIENT_APP_GUID = _require_env("CSOB_CLIENT_APP_GUID")
 CERT_PEM = Path(os.environ.get("CSOB_CERT_PEM", "certs/bccert.pem"))
 CERT_KEY = Path(os.environ.get("CSOB_CERT_KEY", "certs/bccert.key"))
-WSDL_PATH = str(Path(os.environ.get("CSOB_WSDL", "wsdl/CEBBCWS.wsdl")).resolve())
+WSDL_PATH = os.environ.get("CSOB_WSDL") or None
 STATE_DB = os.environ.get(
     "CSOB_STATE_DB",
     f"sqlite:///{Path(tempfile.gettempdir()) / 'csob_prod_test_state.db'}",
