@@ -10,7 +10,7 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 authors = [
-    {name = "SDK Maintainers", email = "sdk@example.com"},
+    {name = "ThinkHome", email = "info@thinkhome.org"},
 ]
 keywords = ["csob", "ceb", "business-connector", "banking", "soap", "mtls"]
 classifiers = [
@@ -55,8 +55,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/example/csob-ceb-business-connector-sdk"
-Repository = "https://github.com/example/csob-ceb-business-connector-sdk"
+Homepage = "https://github.com/thinkhome-org/csob-ceb-bc"
+Repository = "https://github.com/thinkhome-org/csob-ceb-bc"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/csob_ceb_bc"]
@@ -78,7 +78,4 @@ warn_unused_configs = true
 testpaths = ["tests"]
 addopts = "--cov=src/csob_ceb_bc --cov-report=term-missing"
 
-[dependency-groups]
-dev = [
-    "pypdf>=6.10.2",
-]
+

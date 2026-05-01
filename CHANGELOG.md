@@ -4,6 +4,13 @@
 
 ### Added
 - `MetricsCollector` with counters, histograms, gauges and `timed` context manager
+- WSDL/XSD artifacts bundled inside the package wheel (`csob_ceb_bc/wsdl/`)
+- Zeep contract tests proving local WSDL serialization
+- `CertificateStore.validate_key_matches_cert()` (pre-flight cert/key pair check)
+- Upload crash recovery via persisted `local_path` in `upload_attempts`
+- Import-protocol safety: download IMPPROT files even without local idempotency key
+- Production test script (`test_prod.py`) with mandatory env guards and upload opt-in
+- `.env.example` template for production testing
 - Metrics wired into all workflow managers (download, upload, import protocols)
 - `BusinessConnectorClient.metrics_snapshot()` public API
 - Edge-case tests: connection timeouts, read timeouts, SSL errors, malformed JSON, malformed schema, expired certificates
