@@ -68,4 +68,5 @@ dmypy.json
 !tests/fixtures/certs/*.pem
 !tests/fixtures/certs/*.crt
 !tests/fixtures/certs/*.key
+!tests/fixtures/certs/*.pfx
 /certs/
